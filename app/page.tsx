@@ -516,19 +516,21 @@ export function EnvelopePreview({ input }: { input: ShapeInput }) {
 export function PlanPreview({ candidate, input, pressureMode, modal = false, showBoundaries = true }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; modal?: boolean; showBoundaries?: boolean }) {
   const boundaries = getEnvelopeBoundaries(input);
   const extent = boundaries.outer.shape === "round" ? boundaries.outer.diameter : Math.max(boundaries.outer.width, boundaries.outer.height);
-  const pad = Math.max(42, extent * 0.32);
+  const pad = candidate.path.shape === "rect" ? Math.max(72, extent * 0.5) : Math.max(42, extent * 0.32);
   const size = extent + 2 * pad;
   const arrowOutward = pressureMode === "internal_pressure";
   const pressureY = extent * 0.43;
   const pressureStart = arrowOutward ? extent * 0.12 : extent * 0.48;
   const pressureEnd = arrowOutward ? extent * 0.45 : extent * 0.15;
   const markerId = modal ? "pressure-arrow-modal" : "pressure-arrow-main";
+  const radiusMarkerId = modal ? "radius-arrow-modal" : "radius-arrow-main";
   return (
     <div className={`drawing functional ${modal ? "modal-drawing" : ""}`}>
       <svg viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} role="img" aria-label="오링 홈 평면 미리보기">
         <defs>
           <pattern id={modal ? "grid-modal" : "grid-main"} width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#8aa099" strokeWidth="0.35" /></pattern>
           <marker id={markerId} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L6,3 L0,6 Z" /></marker>
+          <marker id={radiusMarkerId} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L6,3 L0,6 Z" fill="#d6e9e1" /></marker>
         </defs>
         <rect x={-size / 2} y={-size / 2} width={size} height={size} fill={`url(#${modal ? "grid-modal" : "grid-main"})`} opacity="0.35" />
         {showBoundaries && <>
@@ -541,7 +543,7 @@ export function PlanPreview({ candidate, input, pressureMode, modal = false, sho
           <rect className="groove-svg" data-preview-shape="groove-rect" x={-candidate.path.width / 2} y={-candidate.path.height / 2} width={candidate.path.width} height={candidate.path.height} rx={candidate.path.radius} strokeWidth={candidate.profile.widthMm} />
         )}
         <line className="center-axis" x1={-extent * 0.55} x2={extent * 0.55} y1="0" y2="0" />
-        <PreviewDimensions candidate={candidate} extent={extent} pad={pad} compact={!modal} />
+        <PreviewDimensions candidate={candidate} extent={extent} pad={pad} compact={!modal} radiusMarkerId={radiusMarkerId} />
         {modal && <>
           <line className="pressure-line" x1={pressureStart} x2={pressureEnd} y1={pressureY} y2={pressureY} markerEnd={`url(#${markerId})`} />
           <text className="pressure-svg-label" x={(pressureStart + pressureEnd) / 2} y={pressureY - 3} textAnchor="middle">오링 이동</text>
@@ -574,7 +576,7 @@ function boundaryValidForPreview(boundary: ReturnType<typeof getEnvelopeBoundari
     && boundary.radius >= 0;
 }
 
-function PreviewDimensions({ candidate, extent, pad, compact = false }: { candidate: Candidate; extent: number; pad: number; compact?: boolean }) {
+function PreviewDimensions({ candidate, extent, pad, compact = false, radiusMarkerId }: { candidate: Candidate; extent: number; pad: number; compact?: boolean; radiusMarkerId: string }) {
   const grooveWidth = candidate.profile.widthMm;
   const spacing = Math.max(14, pad * 0.22);
   const top = -extent / 2 - pad + 16;
@@ -609,19 +611,26 @@ function PreviewDimensions({ candidate, extent, pad, compact = false }: { candid
     { label: "중심", width, height, radius, className: "center-gland-dim" },
     { label: "바깥", width: width + grooveWidth, height: height + grooveWidth, radius: radius + grooveWidth / 2, className: "outer-gland-dim" },
   ];
+  const widthDimensions = [dimensions[2], dimensions[1], dimensions[0]];
   const right = extent / 2 + 5;
   return (
     <g className="preview-dimensions">
-      {dimensions.map((dimension, index) => {
+      {widthDimensions.map((dimension, index) => {
         const y = top + index * spacing;
-        const x = right + index * spacing;
         return (
-          <g key={dimension.label} className={dimension.className}>
+          <g key={`width-${dimension.label}`} className={dimension.className}>
             <line x1={-dimension.width / 2} x2={dimension.width / 2} y1={y} y2={y} />
             <line x1={-dimension.width / 2} x2={-dimension.width / 2} y1={-dimension.height / 2} y2={y + 2} />
             <line x1={dimension.width / 2} x2={dimension.width / 2} y1={-dimension.height / 2} y2={y + 2} />
             <path d={`M ${-dimension.width / 2} ${y} l 3.5 -1.8 v 3.6 Z M ${dimension.width / 2} ${y} l -3.5 -1.8 v 3.6 Z`} />
             <text x="0" y={y - 1} textAnchor="middle">{compact ? `${dimension.label} W${dimension.width.toFixed(2)}` : `홈 ${dimension.label} W ${dimension.width.toFixed(2)}`}</text>
+          </g>
+        );
+      })}
+      {dimensions.map((dimension, index) => {
+        const x = right + index * spacing;
+        return (
+          <g key={`height-${dimension.label}`} className={dimension.className}>
             <line x1={x} x2={x} y1={-dimension.height / 2} y2={dimension.height / 2} />
             <line x1={dimension.width / 2} x2={x - 2} y1={-dimension.height / 2} y2={-dimension.height / 2} />
             <line x1={dimension.width / 2} x2={x - 2} y1={dimension.height / 2} y2={dimension.height / 2} />
@@ -630,11 +639,36 @@ function PreviewDimensions({ candidate, extent, pad, compact = false }: { candid
           </g>
         );
       })}
-      <text className="radius-summary" x="0" y={extent / 2 + pad * 0.62} textAnchor="middle">
-        {compact
-          ? `R 내${dimensions[0].radius.toFixed(2)} / 중${dimensions[1].radius.toFixed(2)} / 외${dimensions[2].radius.toFixed(2)}`
-          : `홈 R · 안쪽 ${dimensions[0].radius.toFixed(2)} / 중심 ${dimensions[1].radius.toFixed(2)} / 바깥 ${dimensions[2].radius.toFixed(2)} mm`}
-      </text>
+      <RadiusCallouts dimensions={widthDimensions} extent={extent} pad={pad} compact={compact} markerId={radiusMarkerId} />
+    </g>
+  );
+}
+
+function RadiusCallouts({ dimensions, extent, pad, compact, markerId }: {
+  dimensions: Array<{ label: string; width: number; height: number; radius: number; className: string }>;
+  extent: number;
+  pad: number;
+  compact: boolean;
+  markerId: string;
+}) {
+  const elbowX = -extent / 2 - 5;
+  const labelSpacing = Math.max(13, pad * 0.2);
+  const labelTop = -labelSpacing;
+  return (
+    <g className="radius-callouts" aria-label="홈 모서리 R 지시선">
+      {dimensions.map((dimension, index) => {
+        const labelY = labelTop + index * labelSpacing;
+        const cornerCenterX = -dimension.width / 2 + dimension.radius;
+        const cornerCenterY = -dimension.height / 2 + dimension.radius;
+        const targetX = cornerCenterX - dimension.radius / Math.SQRT2;
+        const targetY = cornerCenterY - dimension.radius / Math.SQRT2;
+        return (
+          <g key={`radius-${dimension.label}`} className={dimension.className}>
+            <path className="radius-leader" d={`M ${elbowX} ${labelY - 2} L ${targetX} ${targetY}`} markerEnd={`url(#${markerId})`} />
+            <text className="radius-label" x={elbowX - 3} y={labelY} textAnchor="end">{compact ? `${dimension.label} R${dimension.radius.toFixed(2)}` : `홈 ${dimension.label} R ${dimension.radius.toFixed(2)} mm`}</text>
+          </g>
+        );
+      })}
     </g>
   );
 }

@@ -303,6 +303,21 @@ test("서로 다른 허용 영역과 홈 형상을 미리보기에 함께 그린
   assert.match(rectInRoundMarkup, /data-preview-shape="groove-rect"/);
 });
 
+test("사각형 홈 미리보기는 바깥·중심·안쪽 W 순서와 R 지시선을 표시한다", () => {
+  const candidate = searchCandidates(rect, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 }).accepted[0];
+  assert.ok(candidate);
+  const markup = renderToStaticMarkup(createElement(PlanPreview, { candidate, input: rect, pressureMode: "internal_vacuum" }));
+  const outerWidth = markup.indexOf("바깥 W");
+  const centerWidth = markup.indexOf("중심 W");
+  const innerWidth = markup.indexOf("안쪽 W");
+  assert.ok(outerWidth >= 0 && outerWidth < centerWidth && centerWidth < innerWidth);
+  assert.match(markup, /aria-label="홈 모서리 R 지시선"/);
+  assert.match(markup, /marker-end="url\(#radius-arrow-main\)"/);
+  assert.match(markup, /바깥 R[\d.]+/);
+  assert.match(markup, /중심 R[\d.]+/);
+  assert.match(markup, /안쪽 R[\d.]+/);
+});
+
 test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 도면에는 상세 주석을 숨긴다", () => {
   const homeMarkup = renderToStaticMarkup(createElement(Home));
   assert.match(homeMarkup, /aria-label="안쪽 금지 경계 형상 선택"/);
