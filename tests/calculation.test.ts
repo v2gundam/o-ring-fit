@@ -138,21 +138,29 @@ test("단면 두께 필터는 선택한 AS568 단면 계열만 남긴다", () =>
 test("Parker 도브테일과 하프 도브테일 표의 단면 치수를 적용한다", () => {
   const wideRound: RoundInput = { ...round, outerDiameter: 140 };
   const full = searchCandidates(wideRound, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53, glandSection: "dovetail" });
-  const half = searchCandidates(wideRound, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53, glandSection: "half_dovetail" });
+  const halfInner = searchCandidates(wideRound, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53, glandSection: "half_dovetail_inner" });
+  const halfOuter = searchCandidates(wideRound, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53, glandSection: "half_dovetail_outer" });
   assert.ok(full.accepted.length > 0);
-  assert.ok(half.accepted.length > 0);
+  assert.ok(halfInner.accepted.length > 0);
+  assert.ok(halfOuter.accepted.length > 0);
   const fullProfile = full.accepted[0].profile;
-  const halfProfile = half.accepted[0].profile;
+  const halfInnerProfile = halfInner.accepted[0].profile;
+  const halfOuterProfile = halfOuter.accepted[0].profile;
   assert.equal(fullProfile.section, "dovetail");
-  assert.equal(halfProfile.section, "half_dovetail");
+  assert.equal(halfInnerProfile.section, "half_dovetail_inner");
+  assert.equal(halfOuterProfile.section, "half_dovetail_outer");
   assert.ok(Math.abs(fullProfile.mouthWidthMm - 0.115 * 25.4) < 1e-8);
   assert.ok(Math.abs(fullProfile.depthMm - 0.112 * 25.4) < 1e-8);
-  assert.ok(Math.abs(halfProfile.mouthWidthMm - 0.126 * 25.4) < 1e-8);
-  assert.ok(Math.abs(halfProfile.depthMm - 0.114 * 25.4) < 1e-8);
+  assert.ok(Math.abs(halfInnerProfile.mouthWidthMm - 0.126 * 25.4) < 1e-8);
+  assert.ok(Math.abs(halfInnerProfile.depthMm - 0.114 * 25.4) < 1e-8);
+  assert.equal(halfInnerProfile.mouthWidthMm, halfOuterProfile.mouthWidthMm);
+  assert.equal(halfInnerProfile.bottomWidthMm, halfOuterProfile.bottomWidthMm);
   assert.ok(fullProfile.bottomWidthMm > fullProfile.mouthWidthMm);
-  assert.ok(halfProfile.bottomWidthMm > halfProfile.mouthWidthMm);
+  assert.ok(halfInnerProfile.bottomWidthMm > halfInnerProfile.mouthWidthMm);
   assert.equal(fullProfile.angleDeg, 66);
   assert.match(buildDxf(full.accepted[0], wideRound, "internal_vacuum", "vacuum"), /GLAND SECTION: DOVETAIL \/ G/);
+  assert.match(buildDxf(halfInner.accepted[0], wideRound, "internal_vacuum", "vacuum"), /GLAND SECTION: HALF DOVETAIL INNER/);
+  assert.match(buildDxf(halfOuter.accepted[0], wideRound, "internal_vacuum", "vacuum"), /GLAND SECTION: HALF DOVETAIL OUTER/);
 });
 
 test("선택 단면의 실제 안쪽 R과 입력용 중심선 R을 구분해 안내한다", () => {

@@ -40,8 +40,16 @@ export function buildDxf(candidate: Candidate, input: ExportInput, pressureMode:
   const bottomLeft = centerX - w / 2;
   const bottomRight = centerX + w / 2;
   const mouthWidth = candidate.profile.mouthWidthMm * sectionScale;
-  const mouthLeft = centerX - mouthWidth / 2;
-  const mouthRight = centerX + mouthWidth / 2;
+  const mouthLeft = candidate.profile.section === "half_dovetail_outer"
+    ? bottomLeft
+    : candidate.profile.section === "half_dovetail_inner"
+      ? bottomRight - mouthWidth
+      : centerX - mouthWidth / 2;
+  const mouthRight = candidate.profile.section === "half_dovetail_inner"
+    ? bottomRight
+    : candidate.profile.section === "half_dovetail_outer"
+      ? bottomLeft + mouthWidth
+      : centerX + mouthWidth / 2;
   addLine(entities, "SECTION", sectionX, sectionY, mouthLeft, sectionY);
   if (candidate.profile.section === "rect") {
     addLine(entities, "SECTION", mouthLeft, sectionY, bottomLeft, sectionY - d);
@@ -49,8 +57,11 @@ export function buildDxf(candidate: Candidate, input: ExportInput, pressureMode:
   } else if (candidate.profile.section === "dovetail") {
     addLine(entities, "SECTION", mouthLeft, sectionY, bottomLeft, sectionY - d);
     addLine(entities, "SECTION", bottomRight, sectionY - d, mouthRight, sectionY);
-  } else {
+  } else if (candidate.profile.section === "half_dovetail_outer") {
     addLine(entities, "SECTION", mouthLeft, sectionY, mouthLeft, sectionY - d);
+    addLine(entities, "SECTION", bottomRight, sectionY - d, mouthRight, sectionY);
+  } else {
+    addLine(entities, "SECTION", mouthLeft, sectionY, bottomLeft, sectionY - d);
     addLine(entities, "SECTION", bottomRight, sectionY - d, mouthRight, sectionY);
   }
   addLine(entities, "SECTION", bottomLeft, sectionY - d, bottomRight, sectionY - d);
@@ -125,6 +136,10 @@ function planDimensionNote(candidate: Candidate) {
 function sectionDimensionNote(candidate: Candidate) {
   const profile = candidate.profile;
   if (profile.section === "rect") return `GLAND SECTION: RECT / WIDTH ${fmt(profile.widthMm)} / DEPTH ${fmt(profile.depthMm)} mm`;
-  const label = profile.section === "dovetail" ? "DOVETAIL" : "HALF DOVETAIL";
+  const label = profile.section === "dovetail"
+    ? "DOVETAIL"
+    : profile.section === "half_dovetail_inner"
+      ? "HALF DOVETAIL INNER"
+      : "HALF DOVETAIL OUTER";
   return `GLAND SECTION: ${label} / G ${fmt(profile.mouthWidthMm)} / MAX ${fmt(profile.bottomWidthMm)} / L ${fmt(profile.depthMm)} / ANGLE ${profile.angleDeg} DEG / R ${fmt(profile.cornerRadiusMm)} / R1 ${fmt(profile.bottomRadiusMm)} mm`;
 }

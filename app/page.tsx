@@ -78,7 +78,7 @@ export default function Home() {
     [selected, searchedInput, searchedMode, searchedMedium],
   );
 
-  function runSearchFor(nextPressureMode: PressureMode, nextMedium: Medium) {
+  function runSearchFor(nextPressureMode: PressureMode, nextMedium: Medium, nextGlandSection: GlandSection = glandSection) {
     const nextErrors = validateInput(currentInput);
     if (resolvedGrooveShape === "rect" && (!Number.isFinite(grooveRadius) || grooveRadius <= 0)) {
       nextErrors.push("둥근 사각형 홈의 중심선 R은 0보다 커야 합니다.");
@@ -90,7 +90,7 @@ export default function Home() {
       grooveShape: resolvedGrooveShape,
       grooveRadius: resolvedGrooveShape === "rect" ? grooveRadius : undefined,
       csMm: csFilter,
-      glandSection,
+      glandSection: nextGlandSection,
     });
     setResult(next);
     setSelectedDash(next.accepted[0]?.dash ?? "");
@@ -121,6 +121,11 @@ export default function Home() {
   function setMediumAndSearch(nextMedium: Medium) {
     setMedium(nextMedium);
     runSearchFor(pressureMode, nextMedium);
+  }
+
+  function setGlandSectionAndSearch(nextSection: GlandSection) {
+    setGlandSection(nextSection);
+    runSearchFor(pressureMode, medium, nextSection);
   }
 
   function exportDxf() {
@@ -204,10 +209,11 @@ export default function Home() {
               </select>
             </label>
             <label>홈 단면
-              <select value={glandSection} onChange={(event) => setGlandSection(event.target.value as GlandSection)}>
-                <option value="rect">직사각형 · 표준</option>
-                <option value="dovetail">도브테일 · 양쪽 유지</option>
-                <option value="half_dovetail">하프 도브테일 · 한쪽 유지</option>
+              <select value={glandSection} onChange={(event) => setGlandSectionAndSearch(event.target.value as GlandSection)}>
+                <option value="rect">직사각</option>
+                <option value="dovetail">도브</option>
+                <option value="half_dovetail_inner">하프 도브 내측</option>
+                <option value="half_dovetail_outer">하프 도브 외측</option>
               </select>
             </label>
             {resolvedGrooveShape === "rect" && (
@@ -244,7 +250,7 @@ export default function Home() {
             {grooveMode === "auto" && <em>자동 적용</em>}
           </div>
           {glandSection !== "rect" && (
-            <div className="retention-note"><b>{glandSection === "dovetail" ? "도브테일" : "하프 도브테일"} 유지 홈</b><span>Parker 66° 단면 · 금속 간 접촉 기준</span><em>온도 범위·FKM 팽윤·가공 공차 추가 검토</em></div>
+            <div className="retention-note"><b>{glandSectionLabel(glandSection)} 유지 홈</b><span>Parker 66° 단면 · 금속 간 접촉 기준</span><em>{glandSection === "half_dovetail_inner" ? "경사 유지벽: 챔버 중심 쪽" : glandSection === "half_dovetail_outer" ? "경사 유지벽: 플랜지 바깥쪽" : "양쪽 경사 유지벽"} · 온도 범위·FKM 팽윤·가공 공차 추가 검토</em></div>
           )}
 
           <div className="condition-row">
@@ -567,7 +573,9 @@ function CrossSection({ candidate }: { candidate: Candidate }) {
   const section = candidate.profile.section;
   const groovePath = section === "dovetail"
     ? "M12 18 H91 Q88 18 86 23 L62 70 H198 L174 23 Q172 18 169 18 H248"
-    : section === "half_dovetail"
+    : section === "half_dovetail_inner"
+      ? "M12 18 H91 Q88 18 86 23 L62 70 H174 V18 H248"
+      : section === "half_dovetail_outer"
       ? "M12 18 H86 V70 H198 L174 23 Q172 18 169 18 H248"
       : "M12 18 H70 V70 H190 V18 H248";
   return (
@@ -578,7 +586,8 @@ function CrossSection({ candidate }: { candidate: Candidate }) {
         <line x1="70" y1="82" x2="190" y2="82" /><line x1="70" y1="77" x2="70" y2="87" /><line x1="190" y1="77" x2="190" y2="87" />
         <text x="130" y="90" textAnchor="middle">{section === "rect" ? "W" : "MAX"} {width.toFixed(2)} mm</text>
         <text x="200" y="51">{section === "rect" ? "D" : "L"} {depth.toFixed(2)} mm</text>
-        {section !== "rect" && <><text x="130" y="15" textAnchor="middle">G {candidate.profile.mouthWidthMm.toFixed(2)} mm</text><text x="70" y="54">66°</text></>}
+        {section !== "rect" && <><text x="130" y="15" textAnchor="middle">G {candidate.profile.mouthWidthMm.toFixed(2)} mm</text><text x={section === "half_dovetail_outer" ? "190" : "70"} y="54">66°</text></>}
+        {section.startsWith("half_dovetail") && <><text x="18" y="86">내측</text><text x="220" y="86">외측</text></>}
       </svg>
     </div>
   );
@@ -591,4 +600,9 @@ function pressureModeLabel(value: PressureMode) {
   return "내부 진공";
 }
 function mediumLabel(value: Medium) { return value === "liquid" ? "액체" : value === "gas" ? "기체" : "진공/기체"; }
-function glandSectionLabel(value: GlandSection) { return value === "dovetail" ? "도브테일" : value === "half_dovetail" ? "하프 도브테일" : "직사각형"; }
+function glandSectionLabel(value: GlandSection) {
+  if (value === "dovetail") return "도브";
+  if (value === "half_dovetail_inner") return "하프 도브 내측";
+  if (value === "half_dovetail_outer") return "하프 도브 외측";
+  return "직사각";
+}

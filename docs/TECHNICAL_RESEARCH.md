@@ -18,6 +18,7 @@
 - 제한된 빈 공간 때문에 넓은 온도 범위, 일반 공차 극단 또는 높은 엘라스토머 팽윤을 허용하기 어렵다.
 - 입구 반경 `R`은 설치 손상과 압출 위험에 직접 영향을 주므로 표의 고정값을 사용한다.
 - 단면 각도는 66°이며 평균 홈 직경은 평균 오링 직경과 일치시킨다.
+- Parker 표에는 압력에 따른 하프 도브 경사벽 방향 강제 규정이 없으므로 앱은 내측형과 외측형을 별도 선택지로 제공하고 DXF에 방향을 명시한다.
 - 공식 근거: [Parker Dovetail and Half-Dovetail Design Charts](https://www.parker.com/content/dam/Parker-com/Literature/O-Ring-Division-Literature/O-Ring-ehandbook-pdfs/Dovetail-and-half-dovetail-design-charts.pdf)
 
 ### 비원형 홈의 모서리 반경 안내

@@ -7,7 +7,7 @@ const MAX_CIRCUMFERENTIAL_COMPRESSION = 0.03;
 export type PressureMode = "internal_pressure" | "internal_vacuum" | "external_pressure";
 export type Medium = "liquid" | "gas" | "vacuum";
 export type GrooveShape = "round" | "rect";
-export type GlandSection = "rect" | "dovetail" | "half_dovetail";
+export type GlandSection = "rect" | "dovetail" | "half_dovetail_inner" | "half_dovetail_outer";
 
 export type SearchOptions = {
   grooveShape?: GrooveShape;
@@ -225,7 +225,8 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
 
   const warnings: string[] = [];
   if (profile.section === "dovetail") warnings.push("도브테일은 유지가 꼭 필요한 경우에만 사용하고 온도·팽윤·공차를 별도 검토해야 합니다.");
-  if (profile.section === "half_dovetail") warnings.push("하프 도브테일은 유지 방향과 압력 지지벽 방향을 가공 전 확인해야 합니다.");
+  if (profile.section === "half_dovetail_inner") warnings.push("하프 도브 내측형: 경사 유지벽이 챔버 중심 쪽입니다. 압력 지지벽 방향을 가공 전 확인해야 합니다.");
+  if (profile.section === "half_dovetail_outer") warnings.push("하프 도브 외측형: 경사 유지벽이 플랜지 바깥쪽입니다. 압력 지지벽 방향을 가공 전 확인해야 합니다.");
   const ratio = geometry.innerCornerRatio;
   if (ratio !== null && ratio < 6) warnings.push(`안쪽 R이 CS의 ${ratio.toFixed(1)}배로 이상적 기준 6배보다 작습니다.`);
   if (Math.abs(strain) > 0.03) warnings.push("설치 변형률이 권장 범위 상단에 가깝습니다.");
