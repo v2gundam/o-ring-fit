@@ -76,6 +76,7 @@ test("DXF는 R14·mm 헤더와 닫힌 둥근 사각형 가공 루프를 포함�
   assert.match(dxf, /\$INSUNITS\n70\n4/);
   assert.match(dxf, /0\nLWPOLYLINE[\s\S]*?70\n1/);
   assert.match(dxf, /8\nGROOVE_CUT/);
+  assert.match(dxf, /GLAND PLAN IN W[\d.]+ H[\d.]+ R[\d.]+ \/ CENTER W[\d.]+ H[\d.]+ R[\d.]+ \/ OUT W[\d.]+ H[\d.]+ R[\d.]+ mm/);
   assert.match(dxf, /0\nEOF/);
 });
 

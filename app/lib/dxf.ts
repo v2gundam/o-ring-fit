@@ -104,5 +104,5 @@ function planDimensionNote(candidate: Candidate) {
   if (candidate.path.shape === "round") {
     return `GLAND PLAN: ID ${fmt(candidate.path.diameter - width)} / CENTER DIA ${fmt(candidate.path.diameter)} / OD ${fmt(candidate.path.diameter + width)} mm`;
   }
-  return `GLAND CENTER PATH: W ${fmt(candidate.path.width)} / H ${fmt(candidate.path.height)} / R ${fmt(candidate.path.radius)} mm`;
+  return `GLAND PLAN IN W${fmt(candidate.path.width - width)} H${fmt(candidate.path.height - width)} R${fmt(candidate.path.radius - width / 2)} / CENTER W${fmt(candidate.path.width)} H${fmt(candidate.path.height)} R${fmt(candidate.path.radius)} / OUT W${fmt(candidate.path.width + width)} H${fmt(candidate.path.height + width)} R${fmt(candidate.path.radius + width / 2)} mm`;
 }

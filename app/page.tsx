@@ -323,7 +323,7 @@ function NoMatch({ near }: { near: ReturnType<typeof searchCandidates>["near"] }
 
 function PlanPreview({ candidate, input, pressureMode, modal = false }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; modal?: boolean }) {
   const extent = input.shape === "round" ? input.outerDiameter : Math.max(input.outerWidth, input.outerHeight);
-  const pad = Math.max(16, extent * 0.2);
+  const pad = Math.max(24, extent * 0.28);
   const size = extent + 2 * pad;
   const arrowOutward = pressureMode === "internal_pressure";
   const pressureY = extent * 0.43;
@@ -363,38 +363,64 @@ function PlanPreview({ candidate, input, pressureMode, modal = false }: { candid
 }
 
 function PreviewDimensions({ candidate, extent, pad }: { candidate: Candidate; extent: number; pad: number }) {
-  const dimOffset = Math.max(5, pad * 0.38);
+  const grooveWidth = candidate.profile.widthMm;
+  const spacing = Math.max(6, pad * 0.23);
+  const top = -extent / 2 - pad + 5;
   if (candidate.path.shape === "round") {
-    const radius = candidate.path.diameter / 2;
-    const y = -extent / 2 - dimOffset;
+    const dimensions = [
+      { label: "홈 내경", diameter: candidate.path.diameter - grooveWidth, className: "inner-gland-dim" },
+      { label: "홈 중심경", diameter: candidate.path.diameter, className: "center-gland-dim" },
+      { label: "홈 외경", diameter: candidate.path.diameter + grooveWidth, className: "outer-gland-dim" },
+    ];
     return (
       <g className="preview-dimensions">
-        <line x1={-radius} x2={radius} y1={y} y2={y} />
-        <line x1={-radius} x2={-radius} y1={-8} y2={y + 3} />
-        <line x1={radius} x2={radius} y1={-8} y2={y + 3} />
-        <path d={`M ${-radius} ${y} l 4 -2 v 4 Z M ${radius} ${y} l -4 -2 v 4 Z`} />
-        <text x="0" y={y - 3} textAnchor="middle">홈 중심 Ø {candidate.path.diameter.toFixed(2)} mm</text>
+        {dimensions.map((dimension, index) => {
+          const radius = dimension.diameter / 2;
+          const y = top + index * spacing;
+          return (
+            <g key={dimension.label} className={dimension.className}>
+              <line x1={-radius} x2={radius} y1={y} y2={y} />
+              <line x1={-radius} x2={-radius} y1={-extent * 0.12} y2={y + 2} />
+              <line x1={radius} x2={radius} y1={-extent * 0.12} y2={y + 2} />
+              <path d={`M ${-radius} ${y} l 3.5 -1.8 v 3.6 Z M ${radius} ${y} l -3.5 -1.8 v 3.6 Z`} />
+              <text x="0" y={y - 2.2} textAnchor="middle">{dimension.label} Ø {dimension.diameter.toFixed(2)} mm</text>
+            </g>
+          );
+        })}
       </g>
     );
   }
 
   const { width, height, radius } = candidate.path;
-  const topY = -extent / 2 - dimOffset;
-  const rightX = extent / 2 + dimOffset;
+  const dimensions = [
+    { label: "안쪽", width: width - grooveWidth, height: height - grooveWidth, radius: radius - grooveWidth / 2, className: "inner-gland-dim" },
+    { label: "중심", width, height, radius, className: "center-gland-dim" },
+    { label: "바깥", width: width + grooveWidth, height: height + grooveWidth, radius: radius + grooveWidth / 2, className: "outer-gland-dim" },
+  ];
+  const right = extent / 2 + 5;
   return (
     <g className="preview-dimensions">
-      <line x1={-width / 2} x2={width / 2} y1={topY} y2={topY} />
-      <line x1={-width / 2} x2={-width / 2} y1={-height / 2} y2={topY + 3} />
-      <line x1={width / 2} x2={width / 2} y1={-height / 2} y2={topY + 3} />
-      <path d={`M ${-width / 2} ${topY} l 4 -2 v 4 Z M ${width / 2} ${topY} l -4 -2 v 4 Z`} />
-      <text x="0" y={topY - 3} textAnchor="middle">홈 중심 W {width.toFixed(2)} mm</text>
-      <line x1={rightX} x2={rightX} y1={-height / 2} y2={height / 2} />
-      <line x1={width / 2} x2={rightX - 3} y1={-height / 2} y2={-height / 2} />
-      <line x1={width / 2} x2={rightX - 3} y1={height / 2} y2={height / 2} />
-      <path d={`M ${rightX} ${-height / 2} l -2 4 h 4 Z M ${rightX} ${height / 2} l -2 -4 h 4 Z`} />
-      <text x={rightX + 4} y="0" textAnchor="middle" transform={`rotate(90 ${rightX + 4} 0)`}>홈 중심 H {height.toFixed(2)} mm</text>
-      <path className="radius-leader" d={`M ${width / 2 - radius * 0.7} ${-height / 2 + radius * 0.3} l ${Math.max(8, radius * 0.8)} ${-Math.max(7, radius * 0.5)}`} />
-      <text className="radius-text" x={width / 2 - radius * 0.05} y={-height / 2 + radius * 0.3 - Math.max(8, radius * 0.5)}>R {radius.toFixed(2)}</text>
+      {dimensions.map((dimension, index) => {
+        const y = top + index * spacing;
+        const x = right + index * spacing;
+        return (
+          <g key={dimension.label} className={dimension.className}>
+            <line x1={-dimension.width / 2} x2={dimension.width / 2} y1={y} y2={y} />
+            <line x1={-dimension.width / 2} x2={-dimension.width / 2} y1={-dimension.height / 2} y2={y + 2} />
+            <line x1={dimension.width / 2} x2={dimension.width / 2} y1={-dimension.height / 2} y2={y + 2} />
+            <path d={`M ${-dimension.width / 2} ${y} l 3.5 -1.8 v 3.6 Z M ${dimension.width / 2} ${y} l -3.5 -1.8 v 3.6 Z`} />
+            <text x="0" y={y - 2.2} textAnchor="middle">홈 {dimension.label} W {dimension.width.toFixed(2)}</text>
+            <line x1={x} x2={x} y1={-dimension.height / 2} y2={dimension.height / 2} />
+            <line x1={dimension.width / 2} x2={x - 2} y1={-dimension.height / 2} y2={-dimension.height / 2} />
+            <line x1={dimension.width / 2} x2={x - 2} y1={dimension.height / 2} y2={dimension.height / 2} />
+            <path d={`M ${x} ${-dimension.height / 2} l -1.8 3.5 h 3.6 Z M ${x} ${dimension.height / 2} l -1.8 -3.5 h 3.6 Z`} />
+            <text x={x + 3} y="0" textAnchor="middle" transform={`rotate(90 ${x + 3} 0)`}>{dimension.label} H {dimension.height.toFixed(2)}</text>
+          </g>
+        );
+      })}
+      <text className="radius-summary" x="0" y={extent / 2 + pad * 0.62} textAnchor="middle">
+        홈 R · 안쪽 {dimensions[0].radius.toFixed(2)} / 중심 {dimensions[1].radius.toFixed(2)} / 바깥 {dimensions[2].radius.toFixed(2)} mm
+      </text>
     </g>
   );
 }
