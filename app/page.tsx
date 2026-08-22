@@ -78,7 +78,7 @@ export default function Home() {
     [selected, searchedInput, searchedMode, searchedMedium],
   );
 
-  function runSearch() {
+  function runSearchFor(nextPressureMode: PressureMode, nextMedium: Medium) {
     const nextErrors = validateInput(currentInput);
     if (resolvedGrooveShape === "rect" && (!Number.isFinite(grooveRadius) || grooveRadius <= 0)) {
       nextErrors.push("둥근 사각형 홈의 중심선 R은 0보다 커야 합니다.");
@@ -86,7 +86,7 @@ export default function Home() {
     setErrors(nextErrors);
     setDxfOpen(false);
     if (nextErrors.length) return;
-    const next = searchCandidates(currentInput, medium, pressureMode, {
+    const next = searchCandidates(currentInput, nextMedium, nextPressureMode, {
       grooveShape: resolvedGrooveShape,
       grooveRadius: resolvedGrooveShape === "rect" ? grooveRadius : undefined,
       csMm: csFilter,
@@ -95,8 +95,12 @@ export default function Home() {
     setResult(next);
     setSelectedDash(next.accepted[0]?.dash ?? "");
     setSearchedInput(currentInput);
-    setSearchedMode(pressureMode);
-    setSearchedMedium(medium);
+    setSearchedMode(nextPressureMode);
+    setSearchedMedium(nextMedium);
+  }
+
+  function runSearch() {
+    runSearchFor(pressureMode, medium);
   }
 
   function setRoundValue(key: keyof RoundInput, value: number) {
@@ -105,6 +109,18 @@ export default function Home() {
 
   function setRectValue(key: keyof RectInput, value: number) {
     setRect((previous) => ({ ...previous, [key]: value }));
+  }
+
+  function setOperatingMode(nextMode: PressureMode) {
+    const nextMedium: Medium = nextMode === "internal_vacuum" ? "vacuum" : medium === "vacuum" ? "gas" : medium;
+    setPressureMode(nextMode);
+    setMedium(nextMedium);
+    runSearchFor(nextMode, nextMedium);
+  }
+
+  function setMediumAndSearch(nextMedium: Medium) {
+    setMedium(nextMedium);
+    runSearchFor(pressureMode, nextMedium);
   }
 
   function exportDxf() {
@@ -232,20 +248,32 @@ export default function Home() {
           )}
 
           <div className="condition-row">
-            <label>압력 방향
-              <select value={pressureMode} onChange={(event) => setPressureMode(event.target.value as PressureMode)}>
+            <label>운전 상태 / 압력 방향
+              <select value={pressureMode} onChange={(event) => setOperatingMode(event.target.value as PressureMode)}>
                 <option value="internal_vacuum">챔버 내부 진공</option>
                 <option value="internal_pressure">챔버 내부 가압</option>
                 <option value="external_pressure">외부 가압</option>
               </select>
             </label>
-            <label>밀봉 매체
-              <select value={medium} onChange={(event) => setMedium(event.target.value as Medium)}>
-                <option value="vacuum">진공 / 기체</option>
-                <option value="gas">기체</option>
-                <option value="liquid">액체</option>
+            <label>매체 / 홈 폭 기준
+              <select value={medium} disabled={pressureMode === "internal_vacuum"} onChange={(event) => setMediumAndSearch(event.target.value as Medium)}>
+                {pressureMode === "internal_vacuum" ? <option value="vacuum">진공 · 좁은 홈</option> : <>
+                  <option value="gas">기체 · 좁은 홈</option>
+                  <option value="liquid">액체 · 팽윤 여유 홈</option>
+                </>}
               </select>
             </label>
+          </div>
+          <div className="pressure-design-note">
+            {glandSection === "rect" ? <>
+              <b>{pressureMode === "internal_pressure" ? "외경 기준 배치" : "내경 기준 배치"}</b>
+              <span>{pressureMode === "internal_pressure" ? "내부 가압 → 오링이 홈 외측 벽에 지지" : "내부 진공/외부 가압 → 오링이 홈 내측 벽에 지지"}</span>
+              <em>{medium === "liquid" ? "액체용 넓은 홈 폭 적용" : "진공·기체용 동일한 좁은 홈 폭 적용"}</em>
+            </> : <>
+              <b>유지 홈 평균경 기준</b>
+              <span>도브테일 계열은 Parker 유지 홈 표의 평균경 기준 적용</span>
+              <em>압력 방향은 지지벽 표시에 반영 · 평면 치수는 압력 방향으로 이동하지 않음</em>
+            </>}
           </div>
 
           <div className="fixed-material">
@@ -307,7 +335,8 @@ export default function Home() {
               <div className="selection-details">
                 <span>지지벽 <b>{supportWallKo(selected.supportWall)}</b></span>
                 <span>압착률 <b>{selected.profile.squeezePercent.toFixed(1)}%</b></span>
-                <span>중심 경로 <b>{selected.pathLengthMm.toFixed(2)} mm</b></span>
+                <span>오링 설치 중심선 <b>{selected.pathLengthMm.toFixed(2)} mm</b></span>
+                <span>홈 중심 경로 <b>{selected.groovePathLengthMm.toFixed(2)} mm</b></span>
                 {selected.path.shape === "rect" && (
                   <span>실제 안쪽 R <b>{(selected.path.radius - selected.profile.widthMm / 2).toFixed(2)} mm</b> · 최소 {(3 * selected.csMm).toFixed(2)} / 권장 {(6 * selected.csMm).toFixed(2)} mm</span>
                 )}

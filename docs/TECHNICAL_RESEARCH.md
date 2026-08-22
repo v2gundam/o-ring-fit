@@ -72,6 +72,8 @@
 | 외부 가압 | 반경 안쪽 | 글랜드 내경 벽 | 오링 평균 ID와 글랜드 ID |
 | 챔버 내부 진공 | 외부에서 안쪽 | 글랜드 내경 벽 | 오링 평균 ID와 글랜드 ID |
 
+앱 구현에서는 이 기준을 단순 화살표 표시에 그치지 않고 실제 홈 경로에 적용한다. 직사각형 단면 면 씰에서 내부 가압은 홈 바깥 경계를 오링 평균 OD에, 내부 진공·외부 가압은 홈 안쪽 경계를 오링 평균 ID에 맞춘다. 진공과 기체의 홈 폭·깊이는 Design Chart 4-3에서 동일하고, 액체만 팽윤 여유 때문에 더 넓은 홈 폭을 사용한다.
+
 근거:
 
 - [Parker O-Ring Handbook ORD 5700](https://www.parker.com/content/dam/Parker-com/Literature/O-Ring-Division-Literature/ORD-5700.pdf)

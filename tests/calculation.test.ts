@@ -39,6 +39,21 @@ test("원형 기본 예제는 허용 영역 안의 표준 후보를 찾는다", 
   }
 });
 
+test("내부 가압과 내부 진공은 각각 외경·내경 지지벽을 기준으로 홈 위치를 바꾼다", () => {
+  const pressure = searchCandidates(round, "gas", "internal_pressure", { grooveShape: "round", csMm: 3.53 }).accepted[0];
+  const vacuum = searchCandidates(round, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 }).accepted[0];
+  assert.ok(pressure);
+  assert.ok(vacuum);
+  assert.equal(pressure.path.shape, "round");
+  assert.equal(vacuum.path.shape, "round");
+  if (pressure.path.shape !== "round" || vacuum.path.shape !== "round") return;
+  assert.equal(pressure.supportWall, "GROOVE OD");
+  assert.equal(vacuum.supportWall, "GROOVE ID");
+  assert.ok(Math.abs((pressure.path.diameter + pressure.profile.widthMm) - pressure.odMm) < 1e-8);
+  assert.ok(Math.abs((vacuum.path.diameter - vacuum.profile.widthMm) - vacuum.idMm) < 1e-8);
+  assert.notEqual(pressure.path.diameter, vacuum.path.diameter);
+});
+
 test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한다", () => {
   const result = searchCandidates(rect, "gas", "internal_pressure", { grooveShape: "rect", grooveRadius: 20 });
   assert.ok(result.accepted.length > 1);
