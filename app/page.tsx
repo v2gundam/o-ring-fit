@@ -41,6 +41,10 @@ const initialMedium: Medium = "vacuum";
 const initialSearch = searchCandidates(initialRound, initialMedium, initialMode, { grooveShape: "round" });
 const crossSections = [1.78, 2.62, 3.53, 5.33, 6.99];
 
+function sortByDash<T extends { dash: string }>(items: readonly T[]) {
+  return [...items].sort((left, right) => left.dash.localeCompare(right.dash, undefined, { numeric: true }));
+}
+
 export default function Home() {
   const [shape, setShape] = useState<"round" | "rect">("round");
   const [round, setRound] = useState(initialRound);
@@ -52,14 +56,15 @@ export default function Home() {
   const [csFilter, setCsFilter] = useState<number | null>(null);
   const [glandSection, setGlandSection] = useState<GlandSection>("rect");
   const [result, setResult] = useState(initialSearch);
-  const [selectedDash, setSelectedDash] = useState(initialSearch.accepted[0]?.dash ?? "");
+  const [selectedDash, setSelectedDash] = useState(sortByDash(initialSearch.accepted)[0]?.dash ?? "");
   const [errors, setErrors] = useState<string[]>([]);
   const [searchedInput, setSearchedInput] = useState<ShapeInput>(initialRound);
   const [searchedMode, setSearchedMode] = useState<PressureMode>(initialMode);
   const [searchedMedium, setSearchedMedium] = useState<Medium>(initialMedium);
   const [dxfOpen, setDxfOpen] = useState(false);
 
-  const selected = result.accepted.find((item) => item.dash === selectedDash) ?? result.accepted[0] ?? null;
+  const orderedCandidates = useMemo(() => sortByDash(result.accepted), [result.accepted]);
+  const selected = orderedCandidates.find((item) => item.dash === selectedDash) ?? orderedCandidates[0] ?? null;
   const currentInput: ShapeInput = shape === "round" ? round : rect;
   const resolvedGrooveShape: GrooveShape = grooveMode === "auto" ? shape : grooveMode;
   const cornerRadiusGuidance = useMemo(
@@ -93,7 +98,7 @@ export default function Home() {
       glandSection: nextGlandSection,
     });
     setResult(next);
-    setSelectedDash(next.accepted[0]?.dash ?? "");
+    setSelectedDash(sortByDash(next.accepted)[0]?.dash ?? "");
     setSearchedInput(currentInput);
     setSearchedMode(nextPressureMode);
     setSearchedMedium(nextMedium);
@@ -280,8 +285,8 @@ export default function Home() {
           {result.accepted.length ? (
             <>
               <div className="candidate-count" role="status">
-                <b>{result.accepted.length}개</b>
-                <span>적합 오링 형번 · 적합도 순</span>
+                <b>{orderedCandidates.length}개</b>
+                <span>적합 오링 형번 · 형번 순</span>
               </div>
               <label className="candidate-select">적용할 오링
                 <select
@@ -289,7 +294,7 @@ export default function Home() {
                   onChange={(event) => { setSelectedDash(event.target.value); setDxfOpen(false); }}
                   aria-label="추천 오링 형번 선택"
                 >
-                  {result.accepted.map((candidate) => (
+                  {orderedCandidates.map((candidate) => (
                     <option key={candidate.dash} value={candidate.dash}>
                       AS568-{candidate.dash} · ID {candidate.idMm.toFixed(2)} · CS {candidate.csMm.toFixed(2)} mm · {candidate.label}
                     </option>
@@ -375,7 +380,7 @@ function NoMatch({ near }: { near: ReturnType<typeof searchCandidates>["near"] }
       <span className="no-match-icon">!</span>
       <h3>맞는 표준 오링이 없습니다</h3>
       <p>필요한 홈 폭, 벽 여유, 설치 변형률을 함께 만족하지 못했습니다.</p>
-      {near.length > 0 && <div className="near-list"><b>가까운 형번과 제외 이유</b>{near.map((item) => <div key={item.dash}><span>AS568-{item.dash}</span><small>{item.reason}</small></div>)}</div>}
+      {near.length > 0 && <div className="near-list"><b>가까운 형번과 제외 이유</b>{sortByDash(near).map((item) => <div key={item.dash}><span>AS568-{item.dash}</span><small>{item.reason}</small></div>)}</div>}
     </div>
   );
 }

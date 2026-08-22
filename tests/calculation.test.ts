@@ -134,6 +134,10 @@ test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 �
   assert.match(homeMarkup, /aria-label="추천 오링 형번 선택"/);
   assert.match(homeMarkup, /적합 오링 형번/);
   assert.doesNotMatch(homeMarkup, /class="candidate-list"/);
+  const selectStart = homeMarkup.indexOf('aria-label="추천 오링 형번 선택"');
+  const selectEnd = homeMarkup.indexOf("</select>", selectStart);
+  const displayedDashNumbers = [...homeMarkup.slice(selectStart, selectEnd).matchAll(/AS568-(\d+) ·/g)].map((match) => Number(match[1]));
+  assert.deepEqual(displayedDashNumbers, [...displayedDashNumbers].sort((left, right) => left - right));
 
   const candidate = searchCandidates(round, "vacuum", "internal_vacuum").accepted[0];
   assert.ok(candidate);
