@@ -398,7 +398,7 @@ function NoMatch({ near }: { near: ReturnType<typeof searchCandidates>["near"] }
   );
 }
 
-function PlanPreview({ candidate, input, pressureMode, modal = false }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; modal?: boolean }) {
+export function PlanPreview({ candidate, input, pressureMode, modal = false }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; modal?: boolean }) {
   const extent = input.shape === "round" ? input.outerDiameter : Math.max(input.outerWidth, input.outerHeight);
   const pad = Math.max(24, extent * 0.28);
   const size = extent + 2 * pad;
@@ -417,16 +417,19 @@ function PlanPreview({ candidate, input, pressureMode, modal = false }: { candid
         <rect x={-size / 2} y={-size / 2} width={size} height={size} fill={`url(#${modal ? "grid-modal" : "grid-main"})`} opacity="0.35" />
         {input.shape === "round" ? (
           <>
-            <circle className="boundary-svg outer-svg" r={input.outerDiameter / 2} />
-            <circle className="boundary-svg inner-svg" r={input.innerDiameter / 2} />
-            {candidate.path.shape === "round" && <circle className="groove-svg" r={candidate.path.diameter / 2} strokeWidth={candidate.profile.widthMm} />}
+            <circle className="boundary-svg outer-svg" data-preview-shape="boundary-round" r={input.outerDiameter / 2} />
+            <circle className="boundary-svg inner-svg" data-preview-shape="boundary-round" r={input.innerDiameter / 2} />
           </>
         ) : (
           <>
-            <rect className="boundary-svg outer-svg" x={-input.outerWidth / 2} y={-input.outerHeight / 2} width={input.outerWidth} height={input.outerHeight} rx={input.outerRadius} />
-            <rect className="boundary-svg inner-svg" x={-input.innerWidth / 2} y={-input.innerHeight / 2} width={input.innerWidth} height={input.innerHeight} rx={input.innerRadius} />
-            {candidate.path.shape === "rect" && <rect className="groove-svg" x={-candidate.path.width / 2} y={-candidate.path.height / 2} width={candidate.path.width} height={candidate.path.height} rx={candidate.path.radius} strokeWidth={candidate.profile.widthMm} />}
+            <rect className="boundary-svg outer-svg" data-preview-shape="boundary-rect" x={-input.outerWidth / 2} y={-input.outerHeight / 2} width={input.outerWidth} height={input.outerHeight} rx={input.outerRadius} />
+            <rect className="boundary-svg inner-svg" data-preview-shape="boundary-rect" x={-input.innerWidth / 2} y={-input.innerHeight / 2} width={input.innerWidth} height={input.innerHeight} rx={input.innerRadius} />
           </>
+        )}
+        {candidate.path.shape === "round" ? (
+          <circle className="groove-svg" data-preview-shape="groove-round" r={candidate.path.diameter / 2} strokeWidth={candidate.profile.widthMm} />
+        ) : (
+          <rect className="groove-svg" data-preview-shape="groove-rect" x={-candidate.path.width / 2} y={-candidate.path.height / 2} width={candidate.path.width} height={candidate.path.height} rx={candidate.path.radius} strokeWidth={candidate.profile.widthMm} />
         )}
         <line className="center-axis" x1={-extent * 0.55} x2={extent * 0.55} y1="0" y2="0" />
         <PreviewDimensions candidate={candidate} extent={extent} pad={pad} />

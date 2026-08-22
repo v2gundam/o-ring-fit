@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
 import { buildDxf } from "../app/lib/dxf";
 import { getCornerRadiusGuidance, searchCandidates, validateInput, type RectInput, type RoundInput } from "../app/lib/oring";
+import { PlanPreview } from "../app/page";
 
 const round: RoundInput = {
   shape: "round",
@@ -109,6 +112,21 @@ test("허용 영역과 다른 홈 형상도 실제 포함 관계로 찾는다", 
   assert.ok(rectInRound.accepted.length > 0);
   assert.ok(roundInRect.accepted.every((candidate) => candidate.path.shape === "round"));
   assert.ok(rectInRound.accepted.every((candidate) => candidate.path.shape === "rect"));
+});
+
+test("서로 다른 허용 영역과 홈 형상을 미리보기에 함께 그린다", () => {
+  const roundInRect = searchCandidates({ ...rect, outerWidth: 180, outerHeight: 180 }, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 }).accepted[0];
+  const rectInRound = searchCandidates({ ...round, outerDiameter: 140 }, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 }).accepted[0];
+  assert.ok(roundInRect);
+  assert.ok(rectInRound);
+
+  const roundInRectMarkup = renderToStaticMarkup(createElement(PlanPreview, { candidate: roundInRect, input: rect, pressureMode: "internal_vacuum" }));
+  assert.match(roundInRectMarkup, /data-preview-shape="boundary-rect"/);
+  assert.match(roundInRectMarkup, /data-preview-shape="groove-round"/);
+
+  const rectInRoundMarkup = renderToStaticMarkup(createElement(PlanPreview, { candidate: rectInRound, input: { ...round, outerDiameter: 140 }, pressureMode: "internal_vacuum" }));
+  assert.match(rectInRoundMarkup, /data-preview-shape="boundary-round"/);
+  assert.match(rectInRoundMarkup, /data-preview-shape="groove-rect"/);
 });
 
 test("단면 두께 필터는 선택한 AS568 단면 계열만 남긴다", () => {
