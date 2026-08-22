@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { buildDxf, downloadDxf } from "./lib/dxf";
 import {
   getEnvelopeBoundaries,
@@ -454,10 +454,40 @@ function SectionHead({ number, title, subtitle, light = false }: { number: strin
 }
 
 function InfoPopover({ label, children }: { label: string; children: ReactNode }) {
+  const detailsRef = useRef<HTMLDetailsElement>(null);
+
+  useEffect(() => {
+    function closeFromOutside(event: PointerEvent) {
+      const details = detailsRef.current;
+      if (details?.open && event.target instanceof Node && !details.contains(event.target)) details.open = false;
+    }
+    function closeFromEscape(event: KeyboardEvent) {
+      if (event.key === "Escape" && detailsRef.current?.open) {
+        detailsRef.current.open = false;
+        detailsRef.current.querySelector("summary")?.focus();
+      }
+    }
+    document.addEventListener("pointerdown", closeFromOutside);
+    document.addEventListener("keydown", closeFromEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeFromOutside);
+      document.removeEventListener("keydown", closeFromEscape);
+    };
+  }, []);
+
+  function close() {
+    if (!detailsRef.current) return;
+    detailsRef.current.open = false;
+    detailsRef.current.querySelector("summary")?.focus();
+  }
+
   return (
-    <details className="info-popover">
+    <details className="info-popover" ref={detailsRef}>
       <summary aria-label={label} title={label}>?</summary>
-      <div>{children}</div>
+      <div>
+        <button type="button" className="info-popover-close" onClick={close} aria-label={`${label} 닫기`}>×</button>
+        {children}
+      </div>
     </details>
   );
 }

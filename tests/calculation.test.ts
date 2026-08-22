@@ -322,6 +322,8 @@ test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 �
   const homeMarkup = renderToStaticMarkup(createElement(Home));
   assert.match(homeMarkup, /aria-label="안쪽 금지 경계 형상 선택"/);
   assert.match(homeMarkup, /aria-label="바깥쪽 허용 경계 형상 선택"/);
+  assert.match(homeMarkup, /aria-label="앱 사용 안내 닫기"/);
+  assert.match(homeMarkup, /aria-label="설계 조건 설명 닫기"/);
   assert.match(homeMarkup, /aria-label="추천 오링 형번 선택"/);
   assert.match(homeMarkup, /적합 오링 형번/);
   assert.match(homeMarkup, /입력과 동시에 자동 계산됩니다/);
