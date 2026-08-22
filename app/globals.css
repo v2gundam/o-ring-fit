@@ -197,7 +197,14 @@ footer { font-size:11px; line-height:1.5; }
 .selected-candidate>div { display:flex; min-width:0; flex-direction:column; gap:3px; }
 .selected-candidate>div b { font:600 18px/1 Georgia,serif; }
 .selected-candidate>div span { color:var(--muted); font-size:11px; }
+.shape-availability { display:flex; flex-direction:column; gap:4px; margin-top:10px; padding:11px 12px; border-left:3px solid var(--blue); background:#eef4f6; color:#526e79; font-size:11px; line-height:1.45; }
+.shape-availability b { color:#315e72; font-size:12px; }
+.no-match.shape-mismatch { border-color:#9eb9c3; background:#f3f8fa; }
+.no-match.shape-mismatch .no-match-icon { border-color:var(--blue); color:var(--blue); }
 .preview>.drawing.functional { min-height:390px; margin:12px 0 6px; }
+.envelope-preview { position:relative; }
+.envelope-preview-note { position:absolute; left:50%; bottom:4px; transform:translateX(-50%); display:flex; flex-direction:column; gap:2px; width:max-content; max-width:calc(100% - 16px); padding:6px 9px; background:#23443c; color:#a9bdb6; text-align:center; font-size:9px; line-height:1.35; }
+.envelope-preview-note b { color:#fff; font-size:11px; }
 .dialog-warning { margin-top:12px; padding:9px 11px; border-left:3px solid #d28c2e; background:#fff5e8; color:#7d4e19; font-size:11px; line-height:1.5; }
 .dialog-warning p { margin:3px 0; }
 
@@ -249,10 +256,12 @@ footer { font-size:11px; line-height:1.5; }
   .candidate-count{margin-top:12px;padding:9px 11px}.candidate-count b{font-size:24px}.candidate-count span{font-size:13px}
   .candidate-select{margin-top:10px;font-size:13px}.candidate-select select{min-height:48px;font-size:16px}
   .selected-candidate{padding:10px}.selected-candidate>div b{font-size:19px}.selected-candidate>div span{font-size:12px}
+  .shape-availability{padding:9px 10px;font-size:12px}.shape-availability b{font-size:13px}
   .preview{order:-2;position:sticky;z-index:30;top:0;grid-column:auto;align-self:start;min-height:0;padding:10px 14px 12px;border-bottom:1px solid #476059;box-shadow:0 10px 24px rgba(8,28,23,.22)}
   .inputs{order:-1}.results{order:0}
   .preview-top{display:none}
   .preview>.drawing.functional{min-height:132px;height:132px;margin:0}
+  .envelope-preview-note{bottom:2px;padding:4px 7px;font-size:8px}.envelope-preview-note b{font-size:9px}
   .preview .dxf-button{min-height:44px;margin-top:5px}
   .empty-preview{min-height:132px;padding:10px}
   .preview-dimensions text{font-size:13px;stroke-width:2.5px}.preview-dimensions .radius-summary{font-size:12.5px}

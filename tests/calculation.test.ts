@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildDxf } from "../app/lib/dxf";
 import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForGroovePosition, validateGroovePosition, validateInput, type MixedInput, type RectInput, type RoundInput } from "../app/lib/oring";
-import Home, { PlanPreview } from "../app/page";
+import Home, { EnvelopePreview, NoMatch, PlanPreview } from "../app/page";
 
 const round: RoundInput = {
   shape: "round",
@@ -243,6 +243,22 @@ test("허용 영역과 다른 홈 형상도 실제 포함 관계로 찾는다", 
   assert.ok(rectInRound.accepted.every((candidate) => candidate.path.shape === "rect"));
 });
 
+test("선택 형상만 불가능하면 반대 홈 형상의 후보를 구분해 안내한다", () => {
+  const roundResult = searchCandidates(rect, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 });
+  const rectResult = searchCandidates(rect, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 });
+  assert.equal(roundResult.accepted.length, 0);
+  assert.ok(rectResult.accepted.length > 0);
+
+  const markup = renderToStaticMarkup(createElement(NoMatch, {
+    near: roundResult.near,
+    selectedShape: "round",
+    alternative: { shape: "rect", count: rectResult.accepted.length },
+  }));
+  assert.match(markup, /원형 홈 경로로는 배치할 수 없습니다/);
+  assert.match(markup, /표준 오링 자체가 없는 것은 아닙니다/);
+  assert.match(markup, /둥근 사각형 홈 경로로 바꾸면/);
+});
+
 test("안쪽·바깥쪽 허용 경계의 원형과 사각형을 독립적으로 조합한다", () => {
   const roundInRoundRect = searchCandidates(innerRoundOuterRect, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 });
   const rectInRectRound = searchCandidates(innerRectOuterRound, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 });
@@ -262,6 +278,14 @@ test("혼합 허용 경계와 선택한 홈 형상을 미리보기에 함께 그
   assert.match(markup, /class="boundary-svg outer-svg" data-preview-shape="boundary-rect"/);
   assert.match(markup, /class="boundary-svg inner-svg" data-preview-shape="boundary-round"/);
   assert.match(markup, /data-preview-shape="groove-round"/);
+});
+
+test("후보가 없어도 사용자 입력 안쪽·바깥쪽 경계를 미리보기에 표시한다", () => {
+  const markup = renderToStaticMarkup(createElement(EnvelopePreview, { input: innerRoundOuterRect }));
+  assert.match(markup, /aria-label="사용자 입력 허용 영역 미리보기"/);
+  assert.match(markup, /class="boundary-svg outer-svg" data-preview-shape="boundary-rect"/);
+  assert.match(markup, /class="boundary-svg inner-svg" data-preview-shape="boundary-round"/);
+  assert.match(markup, /입력한 허용 영역/);
 });
 
 test("서로 다른 허용 영역과 홈 형상을 미리보기에 함께 그린다", () => {

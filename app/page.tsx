@@ -118,6 +118,24 @@ export default function Home() {
     },
     [currentInput, customGroovePosition, customGrooveMode, medium, pressureMode, resolvedGrooveShape, grooveRadius, csFilter, glandSection, errors.length],
   );
+  const alternativeGrooveShape: GrooveShape = resolvedGrooveShape === "round" ? "rect" : "round";
+  const alternativeResult = useMemo<ReturnType<typeof searchCandidates>>(() => {
+    if (customGrooveMode || validateInput(currentInput).length) return { accepted: [], near: [] };
+    if (alternativeGrooveShape === "rect" && (!Number.isFinite(grooveRadius) || grooveRadius <= 0)) return { accepted: [], near: [] };
+    return searchCandidates(currentInput, medium, pressureMode, {
+      grooveShape: alternativeGrooveShape,
+      grooveRadius: alternativeGrooveShape === "rect" ? grooveRadius : undefined,
+      csMm: csFilter,
+      glandSection,
+    });
+  }, [currentInput, customGrooveMode, medium, pressureMode, alternativeGrooveShape, grooveRadius, csFilter, glandSection]);
+  const onlyAvailableShape = !customGrooveMode
+    ? result.accepted.length > 0 && alternativeResult.accepted.length === 0
+      ? resolvedGrooveShape
+      : result.accepted.length === 0 && alternativeResult.accepted.length > 0
+        ? alternativeGrooveShape
+        : null
+    : null;
   const orderedCandidates = useMemo(() => sortByDash(result.accepted), [result.accepted]);
   const selected = orderedCandidates.find((item) => item.dash === selectedDash) ?? orderedCandidates[0] ?? null;
   const cornerRadiusGuidance = useMemo(
@@ -373,15 +391,28 @@ export default function Home() {
                   <span className={`fit-badge ${selected.state}`}>{selected.label}</span>
                 </div>
               )}
+              {onlyAvailableShape === resolvedGrooveShape && (
+                <div className="shape-availability" role="note">
+                  <b>현재 허용 영역에서는 {grooveShapeLabel(resolvedGrooveShape)} 홈 경로만 가능합니다.</b>
+                  <span>반대 형상은 현재 CS·벽 여유·설치 변형률 조건을 만족하는 표준 오링 후보가 없습니다.</span>
+                </div>
+              )}
             </>
           ) : (
-            <NoMatch near={result.near} customGrooveMode={customGrooveMode} />
+            <NoMatch
+              near={result.near}
+              customGrooveMode={customGrooveMode}
+              selectedShape={resolvedGrooveShape}
+              alternative={onlyAvailableShape === alternativeGrooveShape
+                ? { shape: alternativeGrooveShape, count: alternativeResult.accepted.length }
+                : null}
+            />
           )}
         </section>
 
         <section className="preview">
           <div className="preview-top">
-            <SectionHead number="03" title="글랜드 미리보기" subtitle={selected ? `AS568-${selected.dash} 적용 형상` : "후보가 선택되지 않았습니다"} light />
+            <SectionHead number="03" title="글랜드 미리보기" subtitle={selected ? `AS568-${selected.dash} 적용 형상` : "입력한 안쪽·바깥쪽 허용 경계"} light />
             <span className="drawing-status">● 실치수 계산</span>
           </div>
 
@@ -391,7 +422,7 @@ export default function Home() {
               <button type="button" className="dxf-button" onClick={() => setDxfOpen(true)}>상세 정보 · DXF <span>↗</span></button>
             </>
           ) : (
-            <div className="empty-preview"><span>Ø</span><b>생성할 글랜드가 없습니다</b><p>허용 영역을 넓히거나 벽 여유와 형상 치수를 조정해 보세요.</p></div>
+            <EnvelopePreview input={currentInput} />
           )}
         </section>
       </section>
@@ -440,13 +471,44 @@ function Dimension({ label, value, onChange }: { label: string; value: number; o
   );
 }
 
-function NoMatch({ near, customGrooveMode = false }: { near: ReturnType<typeof searchCandidates>["near"]; customGrooveMode?: boolean }) {
+export function NoMatch({ near, customGrooveMode = false, selectedShape = "round", alternative = null }: {
+  near: ReturnType<typeof searchCandidates>["near"];
+  customGrooveMode?: boolean;
+  selectedShape?: GrooveShape;
+  alternative?: { shape: GrooveShape; count: number } | null;
+}) {
+  const alternativeAvailable = alternative && alternative.count > 0;
   return (
-    <div className="no-match">
+    <div className={`no-match ${alternativeAvailable ? "shape-mismatch" : ""}`}>
       <span className="no-match-icon">!</span>
-      <h3>맞는 표준 오링이 없습니다</h3>
-      <p>{customGrooveMode ? "지정한 홈 위치와 허용 설치 변형률을 함께 만족하는 형번이 없습니다." : "필요한 홈 폭, 벽 여유, 설치 변형률을 함께 만족하지 못했습니다."}</p>
+      <h3>{alternativeAvailable ? `${grooveShapeLabel(selectedShape)} 홈 경로로는 배치할 수 없습니다` : "맞는 표준 오링이 없습니다"}</h3>
+      <p>{alternativeAvailable
+        ? `표준 오링 자체가 없는 것은 아닙니다. ${grooveShapeLabel(alternative.shape)} 홈 경로로 바꾸면 현재 조건에서 ${alternative.count}개 형번을 적용할 수 있습니다.`
+        : customGrooveMode
+          ? "지정한 홈 위치와 허용 설치 변형률을 함께 만족하는 형번이 없습니다."
+          : "필요한 홈 폭, 벽 여유, 설치 변형률을 함께 만족하지 못했습니다."}</p>
       {near.length > 0 && <div className="near-list"><b>가까운 형번과 제외 이유</b>{sortByDash(near).map((item) => <div key={item.dash}><span>AS568-{item.dash}</span><small>{item.reason}</small></div>)}</div>}
+    </div>
+  );
+}
+
+export function EnvelopePreview({ input }: { input: ShapeInput }) {
+  const boundaries = getEnvelopeBoundaries(input);
+  const outerExtent = boundaryExtent(boundaries.outer);
+  const innerExtent = boundaryExtent(boundaries.inner);
+  const extent = Math.max(outerExtent, innerExtent, 40);
+  const pad = Math.max(24, extent * 0.18);
+  const size = extent + 2 * pad;
+  return (
+    <div className="drawing functional envelope-preview">
+      <svg viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} role="img" aria-label="사용자 입력 허용 영역 미리보기">
+        <defs><pattern id="grid-envelope" width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#8aa099" strokeWidth="0.35" /></pattern></defs>
+        <rect x={-size / 2} y={-size / 2} width={size} height={size} fill="url(#grid-envelope)" opacity="0.35" />
+        {boundaryValidForPreview(boundaries.outer) && <BoundaryPreview boundary={boundaries.outer} className="outer-svg" />}
+        {boundaryValidForPreview(boundaries.inner) && <BoundaryPreview boundary={boundaries.inner} className="inner-svg" />}
+        <line className="center-axis" x1={-extent * 0.55} x2={extent * 0.55} y1="0" y2="0" />
+      </svg>
+      <div className="envelope-preview-note"><b>입력한 허용 영역</b><span>점선: 바깥쪽 허용 경계 · 주황색: 안쪽 금지 경계</span></div>
     </div>
   );
 }
@@ -497,6 +559,19 @@ function BoundaryPreview({ boundary, className }: { boundary: ReturnType<typeof 
   return boundary.shape === "round"
     ? <circle className={`boundary-svg ${className}`} data-preview-shape="boundary-round" r={boundary.diameter / 2} />
     : <rect className={`boundary-svg ${className}`} data-preview-shape="boundary-rect" x={-boundary.width / 2} y={-boundary.height / 2} width={boundary.width} height={boundary.height} rx={boundary.radius} />;
+}
+
+function boundaryExtent(boundary: ReturnType<typeof getEnvelopeBoundaries>["inner"]) {
+  if (!boundaryValidForPreview(boundary)) return 0;
+  return boundary.shape === "round" ? boundary.diameter : Math.max(boundary.width, boundary.height);
+}
+
+function boundaryValidForPreview(boundary: ReturnType<typeof getEnvelopeBoundaries>["inner"]) {
+  if (boundary.shape === "round") return Number.isFinite(boundary.diameter) && boundary.diameter > 0;
+  return [boundary.width, boundary.height, boundary.radius].every(Number.isFinite)
+    && boundary.width > 0
+    && boundary.height > 0
+    && boundary.radius >= 0;
 }
 
 function PreviewDimensions({ candidate, extent, pad, compact = false }: { candidate: Candidate; extent: number; pad: number; compact?: boolean }) {
@@ -658,6 +733,7 @@ function pressureModeLabel(value: PressureMode) {
   return "내부 진공";
 }
 function mediumLabel(value: Medium) { return value === "liquid" ? "액체" : value === "gas" ? "기체" : "진공/기체"; }
+function grooveShapeLabel(value: GrooveShape) { return value === "round" ? "원형" : "둥근 사각형"; }
 function glandSectionLabel(value: GlandSection) {
   if (value === "dovetail") return "도브";
   if (value === "half_dovetail_inner") return "하프 도브 내측";
