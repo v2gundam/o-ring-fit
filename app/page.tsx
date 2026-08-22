@@ -362,7 +362,7 @@ function NoMatch({ near }: { near: ReturnType<typeof searchCandidates>["near"] }
 
 export function PlanPreview({ candidate, input, pressureMode, modal = false }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; modal?: boolean }) {
   const extent = input.shape === "round" ? input.outerDiameter : Math.max(input.outerWidth, input.outerHeight);
-  const pad = Math.max(24, extent * 0.28);
+  const pad = Math.max(42, extent * 0.32);
   const size = extent + 2 * pad;
   const arrowOutward = pressureMode === "internal_pressure";
   const pressureY = extent * 0.43;
@@ -410,7 +410,7 @@ export function PlanPreview({ candidate, input, pressureMode, modal = false }: {
 
 function PreviewDimensions({ candidate, extent, pad }: { candidate: Candidate; extent: number; pad: number }) {
   const grooveWidth = candidate.profile.widthMm;
-  const spacing = Math.max(6, pad * 0.23);
+  const spacing = Math.max(14, pad * 0.22);
   const top = -extent / 2 - pad + 5;
   if (candidate.path.shape === "round") {
     const dimensions = [
