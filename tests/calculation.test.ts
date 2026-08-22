@@ -4,7 +4,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildDxf } from "../app/lib/dxf";
 import { getCornerRadiusGuidance, searchCandidates, validateInput, type RectInput, type RoundInput } from "../app/lib/oring";
-import { PlanPreview } from "../app/page";
+import Home, { PlanPreview } from "../app/page";
 
 const round: RoundInput = {
   shape: "round",
@@ -127,6 +127,20 @@ test("서로 다른 허용 영역과 홈 형상을 미리보기에 함께 그린
   const rectInRoundMarkup = renderToStaticMarkup(createElement(PlanPreview, { candidate: rectInRound, input: { ...round, outerDiameter: 140 }, pressureMode: "internal_vacuum" }));
   assert.match(rectInRoundMarkup, /data-preview-shape="boundary-round"/);
   assert.match(rectInRoundMarkup, /data-preview-shape="groove-rect"/);
+});
+
+test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 도면에는 상세 주석을 숨긴다", () => {
+  const homeMarkup = renderToStaticMarkup(createElement(Home));
+  assert.match(homeMarkup, /aria-label="추천 오링 형번 선택"/);
+  assert.match(homeMarkup, /적합 오링 형번/);
+  assert.doesNotMatch(homeMarkup, /class="candidate-list"/);
+
+  const candidate = searchCandidates(round, "vacuum", "internal_vacuum").accepted[0];
+  assert.ok(candidate);
+  const compactMarkup = renderToStaticMarkup(createElement(PlanPreview, { candidate, input: round, pressureMode: "internal_vacuum" }));
+  const detailMarkup = renderToStaticMarkup(createElement(PlanPreview, { candidate, input: round, pressureMode: "internal_vacuum", modal: true }));
+  assert.doesNotMatch(compactMarkup, /오링 이동/);
+  assert.match(detailMarkup, /오링 이동/);
 });
 
 test("단면 두께 필터는 선택한 AS568 단면 계열만 남긴다", () => {

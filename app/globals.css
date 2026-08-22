@@ -165,6 +165,95 @@ footer { font-size:11px; line-height:1.5; }
 .section-sketch text { font-size:9px; }
 .dxf-dialog>footer span { font-size:10px; }
 .dxf-dialog>footer button { font-size:13px; }
-@media(max-width:1050px){.workbench{grid-template-columns:1fr 1fr}.preview{grid-column:1/-1;min-height:580px}.results{border-right:0}.hero{grid-template-columns:1fr;gap:18px}.hero-copy{max-width:700px}.candidate-list{max-height:420px}}
-@media(max-width:760px){.dxf-sheet{grid-template-columns:1fr}.plan-sheet{border-right:0;border-bottom:1px solid var(--line)}.dxf-dialog>footer{align-items:flex-start;flex-direction:column}.dxf-dialog>footer button{margin:10px 0 0;width:100%}.basis-bar{grid-template-columns:1fr}.basis-bar div+div{border-left:0;border-top:1px solid var(--line)}}
-@media(max-width:680px){.shell{padding:0 14px 30px}.header{height:70px}.header p{display:none}.hero{padding:34px 0 24px}.hero h1{font-size:38px;letter-spacing:-1.5px}.workbench{grid-template-columns:1fr}.inputs,.results{border-right:0;border-bottom:1px solid var(--line)}.preview{grid-column:auto;min-height:570px}.input-groups{grid-template-columns:1fr}.drawing-data{grid-template-columns:1fr 1fr}.drawing-data div:last-child{grid-column:1/-1;border-left:0;border-top:1px solid #3c554f}.plan-dimension-grid{grid-template-columns:1fr}.plan-dimension-grid>span+span{border-left:0;border-top:1px solid var(--line)}.compact .plan-dimension-grid>span+span{border-color:#456159}.pressure-caption{white-space:normal;width:calc(100% - 16px);justify-content:center;text-align:center}footer{align-items:flex-start;flex-direction:column}.modal-backdrop{padding:8px}.dxf-dialog h2{font-size:19px}.modal-drawing{min-height:350px}}
+
+/* Compact workflow: explanations stay available without occupying the working surface. */
+.hero { grid-template-columns:1fr auto; align-items:center; gap:24px; padding:24px 0; }
+.hero h1 { margin-top:6px; font-size:clamp(30px,3vw,42px); letter-spacing:-1.5px; }
+.hero-action { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13px; }
+.info-popover { position:relative; flex:none; }
+.info-popover summary { display:grid; place-items:center; width:30px; height:30px; border:1px solid #9aaba4; border-radius:50%; background:#fff; color:#31584c; font-size:15px; font-weight:800; cursor:pointer; list-style:none; }
+.info-popover summary::-webkit-details-marker { display:none; }
+.info-popover[open] summary { background:var(--ink); color:#fff; border-color:var(--ink); }
+.info-popover>div { position:absolute; z-index:20; top:38px; right:0; width:min(330px,calc(100vw - 32px)); padding:14px 15px; border:1px solid #aab8b2; background:#fff; color:var(--ink); box-shadow:0 16px 40px rgba(20,44,39,.2); font-size:12px; line-height:1.55; }
+.info-popover>div b { display:block; margin-bottom:5px; }
+.info-popover>div p { margin:6px 0 0; color:var(--muted); }
+.dimension-grid { min-width:0; }
+.inline-warning { margin-top:9px; padding:10px 12px; border-left:3px solid var(--orange); background:#fff1ed; color:#8f3726; font-size:12px; line-height:1.45; }
+.input-meta { display:flex; align-items:center; flex-wrap:wrap; gap:7px 12px; margin-top:10px; padding:9px 10px; border:1px solid #d8ded9; background:#f1f3ee; color:var(--muted); font-size:11px; }
+.input-meta>span+span { padding-left:12px; border-left:1px solid #cbd3ce; }
+.input-meta .info-popover { margin-left:auto; }
+.candidate-count { display:flex; align-items:baseline; gap:8px; margin-top:20px; padding:12px 14px; border-left:3px solid var(--orange); background:#fff5ee; }
+.candidate-count b { color:var(--orange-dark); font:600 24px/1 Georgia,serif; }
+.candidate-count span { color:var(--muted); font-size:12px; }
+.candidate-select { display:block; margin-top:14px; color:var(--muted); font-size:12px; font-weight:700; }
+.candidate-select select { width:100%; min-height:48px; margin-top:6px; padding:10px 12px; border:1px solid #9faaa5; background:#fff; color:var(--ink); font-size:14px; font-weight:700; }
+.selected-candidate { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-top:10px; padding:12px; border:1px solid var(--line); background:#f8f7f2; }
+.selected-candidate>div { display:flex; min-width:0; flex-direction:column; gap:3px; }
+.selected-candidate>div b { font:600 18px/1 Georgia,serif; }
+.selected-candidate>div span { color:var(--muted); font-size:11px; }
+.preview>.drawing.functional { min-height:390px; margin:12px 0 6px; }
+.dialog-warning { margin-top:12px; padding:9px 11px; border-left:3px solid #d28c2e; background:#fff5e8; color:#7d4e19; font-size:11px; line-height:1.5; }
+.dialog-warning p { margin:3px 0; }
+
+@media(max-width:1050px){
+  .workbench{grid-template-columns:1fr 1fr}
+  .preview{grid-column:1/-1;min-height:520px}
+  .results{border-right:0}
+  .hero{grid-template-columns:1fr auto}
+}
+@media(max-width:760px){
+  .dxf-sheet{grid-template-columns:1fr}
+  .plan-sheet{border-right:0;border-bottom:1px solid var(--line)}
+  .dxf-dialog>footer{align-items:flex-start;flex-direction:column}
+  .dxf-dialog>footer button{margin:10px 0 0;width:100%}
+  .basis-bar{grid-template-columns:1fr}
+  .basis-bar div+div{border-left:0;border-top:1px solid var(--line)}
+}
+@media(max-width:680px){
+  .shell{padding:0 0 20px}
+  .header{height:58px;padding:0 14px}
+  .brand{font-size:18px}.brand-ring{width:27px;height:27px;border-width:6px}
+  .header p{display:none}.material-chip{padding:6px 9px;font-size:9px}
+  .hero{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .hero .kicker{display:none}.hero h1{margin:0;font-size:22px;letter-spacing:-.7px}
+  .hero-action>span{display:none}
+  .info-popover>div{position:fixed;z-index:60;top:74px;right:14px;left:14px;width:auto}
+  .workbench{grid-template-columns:1fr;border-right:0;border-left:0;box-shadow:none}
+  .inputs,.results,.preview{padding:14px}
+  .inputs,.results{border-right:0;border-bottom:1px solid var(--line)}
+  .section-head{gap:9px;padding-bottom:11px}
+  .section-head>span{width:28px;height:28px;font-size:10px}
+  .section-head b{font-size:16px}.section-head small{display:none}
+  .field-label{margin-top:12px;font-size:11px}
+  .segmented{padding:6px 0 8px}.segmented button{min-height:40px;padding:8px;font-size:13px}
+  .input-groups{grid-template-columns:1fr;gap:7px}
+  fieldset{padding:9px 10px}legend{font-size:11px}
+  .dimension-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+  .dimension{min-height:40px;font-size:11px}
+  .dimension input{width:62px;font-size:15px}.dimension em{width:23px;font-size:10px}
+  .design-options{gap:8px;margin-top:10px;padding-top:10px}
+  .design-options label,.condition-row label{font-size:11px}
+  .design-options select,.condition-row select,.number-control{min-height:40px;margin-top:4px;font-size:13px}
+  .condition-row{gap:8px;margin-top:10px}
+  .input-meta{margin-top:8px;padding:7px 9px;font-size:10px}
+  .inline-warning{padding:8px 10px;font-size:11px}
+  .search-button,.dxf-button{min-height:46px;margin-top:10px;padding:11px 14px;font-size:14px}
+  .candidate-count{margin-top:12px;padding:8px 11px}.candidate-count b{font-size:20px}.candidate-count span{font-size:11px}
+  .candidate-select{margin-top:10px;font-size:11px}.candidate-select select{min-height:44px;font-size:13px}
+  .selected-candidate{padding:9px 10px}.selected-candidate>div b{font-size:16px}.selected-candidate>div span{font-size:10px}
+  .preview{grid-column:auto;min-height:0}
+  .preview-top{align-items:center}.drawing-status{font-size:9px;padding:0}
+  .preview>.drawing.functional{min-height:300px;margin:6px 0 2px}
+  .preview-dimensions text{font-size:5.3px}.preview-dimensions .radius-summary{font-size:5px}
+  .basis-bar,body>.basis-bar{display:none}
+  .shell>footer{display:none}
+  .plan-dimension-grid{grid-template-columns:1fr}
+  .plan-dimension-grid>span+span{border-left:0;border-top:1px solid var(--line)}
+  .compact .plan-dimension-grid>span+span{border-color:#456159}
+  .pressure-caption{white-space:normal;width:calc(100% - 16px);justify-content:center;text-align:center}
+  .modal-backdrop{padding:0}
+  .dxf-dialog{max-height:100vh;min-height:100vh}
+  .dxf-dialog h2{font-size:19px}.dxf-dialog>header{position:sticky;z-index:2;top:0;background:#f8f6ef}
+  .modal-drawing{min-height:330px}
+  .drawing-notes{padding:20px 16px}
+}

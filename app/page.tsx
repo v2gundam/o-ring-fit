@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { buildDxf, downloadDxf } from "./lib/dxf";
 import {
   getCornerRadiusGuidance,
@@ -149,10 +149,16 @@ export default function Home() {
 
       <section className="hero" id="top">
         <div>
-          <span className="kicker">SEAL SPACE → STANDARD RING → GLAND</span>
-          <h1>허용 공간을 입력하면<br />맞는 오링과 홈을 찾습니다.</h1>
+          <span className="kicker">SPACE → O-RING → GLAND</span>
+          <h1>오링·글랜드 선택</h1>
         </div>
-        <p className="hero-copy">챔버와 플랜지 사이에서 홈이 존재할 수 있는 영역을 정의하세요. AS568 표준 형번을 비교하고, 선택한 오링의 가공 형상을 DXF로 받을 수 있습니다.</p>
+        <div className="hero-action">
+          <span>허용 공간을 입력하고 AS568 형번과 가공 홈을 확인하세요.</span>
+          <InfoPopover label="앱 사용 안내">
+            <b>사용 순서</b>
+            <p>허용 영역과 홈 조건을 입력한 뒤 후보를 찾으세요. 적합 형번을 선택하면 평면 홈이 바뀌며, 가공 상세와 단면은 DXF 미리보기에서 확인할 수 있습니다.</p>
+          </InfoPopover>
+        </div>
       </section>
 
       <section className="workbench" aria-label="오링 설계 워크벤치">
@@ -169,27 +175,33 @@ export default function Home() {
             <div className="input-groups single">
               <fieldset>
                 <legend><i className="inner-dot" /> 안쪽 금지 / 바깥쪽 허용</legend>
-                <Dimension label="챔버 내경" value={round.innerDiameter} onChange={(value) => setRoundValue("innerDiameter", value)} />
-                <Dimension label="플랜지 외경" value={round.outerDiameter} onChange={(value) => setRoundValue("outerDiameter", value)} />
-                <Dimension label="안쪽 벽 여유" value={round.innerMargin} onChange={(value) => setRoundValue("innerMargin", value)} />
-                <Dimension label="바깥쪽 벽 여유" value={round.outerMargin} onChange={(value) => setRoundValue("outerMargin", value)} />
+                <div className="dimension-grid">
+                  <Dimension label="챔버 내경" value={round.innerDiameter} onChange={(value) => setRoundValue("innerDiameter", value)} />
+                  <Dimension label="플랜지 외경" value={round.outerDiameter} onChange={(value) => setRoundValue("outerDiameter", value)} />
+                  <Dimension label="안쪽 벽 여유" value={round.innerMargin} onChange={(value) => setRoundValue("innerMargin", value)} />
+                  <Dimension label="바깥쪽 벽 여유" value={round.outerMargin} onChange={(value) => setRoundValue("outerMargin", value)} />
+                </div>
               </fieldset>
             </div>
           ) : (
             <div className="input-groups">
               <fieldset>
                 <legend><i className="inner-dot" /> 안쪽 금지 경계</legend>
-                <Dimension label="가로" value={rect.innerWidth} onChange={(value) => setRectValue("innerWidth", value)} />
-                <Dimension label="세로" value={rect.innerHeight} onChange={(value) => setRectValue("innerHeight", value)} />
-                <Dimension label="모서리 R" value={rect.innerRadius} onChange={(value) => setRectValue("innerRadius", value)} />
-                <Dimension label="벽 여유" value={rect.innerMargin} onChange={(value) => setRectValue("innerMargin", value)} />
+                <div className="dimension-grid">
+                  <Dimension label="가로" value={rect.innerWidth} onChange={(value) => setRectValue("innerWidth", value)} />
+                  <Dimension label="세로" value={rect.innerHeight} onChange={(value) => setRectValue("innerHeight", value)} />
+                  <Dimension label="모서리 R" value={rect.innerRadius} onChange={(value) => setRectValue("innerRadius", value)} />
+                  <Dimension label="벽 여유" value={rect.innerMargin} onChange={(value) => setRectValue("innerMargin", value)} />
+                </div>
               </fieldset>
               <fieldset>
                 <legend><i className="outer-dot" /> 바깥쪽 허용 경계</legend>
-                <Dimension label="가로" value={rect.outerWidth} onChange={(value) => setRectValue("outerWidth", value)} />
-                <Dimension label="세로" value={rect.outerHeight} onChange={(value) => setRectValue("outerHeight", value)} />
-                <Dimension label="모서리 R" value={rect.outerRadius} onChange={(value) => setRectValue("outerRadius", value)} />
-                <Dimension label="벽 여유" value={rect.outerMargin} onChange={(value) => setRectValue("outerMargin", value)} />
+                <div className="dimension-grid">
+                  <Dimension label="가로" value={rect.outerWidth} onChange={(value) => setRectValue("outerWidth", value)} />
+                  <Dimension label="세로" value={rect.outerHeight} onChange={(value) => setRectValue("outerHeight", value)} />
+                  <Dimension label="모서리 R" value={rect.outerRadius} onChange={(value) => setRectValue("outerRadius", value)} />
+                  <Dimension label="벽 여유" value={rect.outerMargin} onChange={(value) => setRectValue("outerMargin", value)} />
+                </div>
               </fieldset>
             </div>
           )}
@@ -223,34 +235,10 @@ export default function Home() {
             )}
           </div>
 
-          {resolvedGrooveShape === "rect" && (
-            <div className={`radius-guide ${cornerRadiusState}`} role="status" aria-live="polite">
-              {cornerRadiusGuidance ? (
-                <>
-                  <div className="radius-guide-head">
-                    <b>모서리 R 기준 · CS {cornerRadiusGuidance.csMm.toFixed(2)} mm</b>
-                    <span>{cornerRadiusState === "invalid" ? "입력 R 부족" : cornerRadiusState === "conditional" ? "최소 기준 충족" : "이상적 기준 충족"}</span>
-                  </div>
-                  <div className="radius-guide-values">
-                    <span><small>실제 홈 안쪽 R</small><b>최소 {cornerRadiusGuidance.minimumInnerRadiusMm.toFixed(2)} mm</b><em>권장 {cornerRadiusGuidance.idealInnerRadiusMm.toFixed(2)} mm</em></span>
-                    <span><small>입력할 중심선 R</small><b>최소 {cornerRadiusGuidance.minimumCenterlineRadiusMm.toFixed(2)} mm</b><em>권장 {cornerRadiusGuidance.idealCenterlineRadiusMm.toFixed(2)} mm</em></span>
-                  </div>
-                  <p>중심선 R = 실제 안쪽 R + 홈 최대 폭 {cornerRadiusGuidance.footprintWidthMm.toFixed(2)} mm ÷ 2</p>
-                </>
-              ) : (
-                <><b>단면 두께를 선택하면 최소 모서리 R을 계산합니다.</b><span>자동 선택 중에는 각 후보별로 3×CS 기준을 검사합니다.</span></>
-              )}
+          {resolvedGrooveShape === "rect" && cornerRadiusGuidance && cornerRadiusState === "invalid" && (
+            <div className="inline-warning" role="alert">
+              모서리 R이 작습니다. 중심선 R을 최소 <b>{cornerRadiusGuidance.minimumCenterlineRadiusMm.toFixed(2)} mm</b> 이상으로 입력하세요.
             </div>
-          )}
-
-          <div className="auto-shape-note">
-            <b>{shape === "round" ? "원형" : "둥근 사각형"} 허용 영역</b>
-            <span>→</span>
-            <b>{resolvedGrooveShape === "round" ? "원형 홈" : "둥근 사각형 홈"}</b>
-            {grooveMode === "auto" && <em>자동 적용</em>}
-          </div>
-          {glandSection !== "rect" && (
-            <div className="retention-note"><b>{glandSectionLabel(glandSection)} 유지 홈</b><span>Parker 66° 단면 · 금속 간 접촉 기준</span><em>{glandSection === "half_dovetail_inner" ? "경사 유지벽: 챔버 중심 쪽" : glandSection === "half_dovetail_outer" ? "경사 유지벽: 플랜지 바깥쪽" : "양쪽 경사 유지벽"} · 온도 범위·FKM 팽윤·가공 공차 추가 검토</em></div>
           )}
 
           <div className="condition-row">
@@ -270,53 +258,50 @@ export default function Home() {
               </select>
             </label>
           </div>
-          <div className="pressure-design-note">
-            {glandSection === "rect" ? <>
-              <b>{pressureMode === "internal_pressure" ? "외경 기준 배치" : "내경 기준 배치"}</b>
-              <span>{pressureMode === "internal_pressure" ? "내부 가압 → 오링이 홈 외측 벽에 지지" : "내부 진공/외부 가압 → 오링이 홈 내측 벽에 지지"}</span>
-              <em>{medium === "liquid" ? "액체용 넓은 홈 폭 적용" : "진공·기체용 동일한 좁은 홈 폭 적용"}</em>
-            </> : <>
-              <b>유지 홈 평균경 기준</b>
-              <span>도브테일 계열은 Parker 유지 홈 표의 평균경 기준 적용</span>
-              <em>압력 방향은 지지벽 표시에 반영 · 평면 치수는 압력 방향으로 이동하지 않음</em>
-            </>}
-          </div>
-
-          <div className="fixed-material">
-            <span>재질</span><b>FKM (Viton™)</b><em>경도·컴파운드 미지정</em>
+          <div className="input-meta">
+            <span><b>{shape === "round" ? "원형" : "둥근 사각형"}</b> → {resolvedGrooveShape === "round" ? "원형 홈" : "둥근 사각형 홈"}</span>
+            <span><b>FKM</b> · Viton™</span>
+            <InfoPopover label="설계 조건 설명">
+              <b>현재 설계 기준</b>
+              <p>{glandSection === "rect"
+                ? `${pressureMode === "internal_pressure" ? "내부 가압은 홈 외경벽" : "내부 진공/외부 가압은 홈 내경벽"}을 지지벽으로 계산합니다.`
+                : `${glandSectionLabel(glandSection)}은 Parker 66° 유지 홈의 평균경 기준을 적용합니다.`}</p>
+              {cornerRadiusGuidance && <p>CS {cornerRadiusGuidance.csMm.toFixed(2)} mm의 중심선 R 최소값은 {cornerRadiusGuidance.minimumCenterlineRadiusMm.toFixed(2)} mm, 권장값은 {cornerRadiusGuidance.idealCenterlineRadiusMm.toFixed(2)} mm입니다.</p>}
+              <p>재질은 FKM으로 고정하며, 경도·컴파운드·온도·압력·표면조도·가공 공차는 제조 전에 별도로 검토해야 합니다.</p>
+            </InfoPopover>
           </div>
           {errors.length > 0 && <div className="error-box" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div>}
           <button type="button" className="search-button" onClick={runSearch}>표준 오링 후보 찾기 <span>→</span></button>
         </section>
 
         <section className="results">
-          <SectionHead
-            number="02"
-            title="추천 후보"
-            subtitle={result.accepted.length ? `${result.accepted.length}개 형번 · 적합도 순` : "조건을 충족하는 표준 형번 없음"}
-          />
+          <SectionHead number="02" title="오링 선택" subtitle="검색 결과에서 적용 형번 선택" />
 
           {result.accepted.length ? (
             <>
-              <div className="candidate-list" aria-label="추천 오링 목록">
-                {result.accepted.map((candidate) => (
-                  <button
-                    type="button"
-                    key={candidate.dash}
-                    className={`candidate ${selected?.dash === candidate.dash ? "selected" : ""}`}
-                    onClick={() => { setSelectedDash(candidate.dash); setDxfOpen(false); }}
-                  >
-                    <span className="radio" />
-                    <span className="candidate-name">
-                      <b>AS568-{candidate.dash}</b>
-                      <small>ID {candidate.idMm.toFixed(2)} · CS {candidate.csMm.toFixed(2)} mm</small>
-                    </span>
-                    <span className={`fit-badge ${candidate.state}`}>{candidate.label}</span>
-                    <span className="chevron">›</span>
-                  </button>
-                ))}
+              <div className="candidate-count" role="status">
+                <b>{result.accepted.length}개</b>
+                <span>적합 오링 형번 · 적합도 순</span>
               </div>
-              <div className="result-note"><span>i</span> 형번을 선택하면 글랜드 중심 경로와 가공 치수가 즉시 바뀝니다.</div>
+              <label className="candidate-select">적용할 오링
+                <select
+                  value={selected?.dash ?? ""}
+                  onChange={(event) => { setSelectedDash(event.target.value); setDxfOpen(false); }}
+                  aria-label="추천 오링 형번 선택"
+                >
+                  {result.accepted.map((candidate) => (
+                    <option key={candidate.dash} value={candidate.dash}>
+                      AS568-{candidate.dash} · ID {candidate.idMm.toFixed(2)} · CS {candidate.csMm.toFixed(2)} mm · {candidate.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              {selected && (
+                <div className="selected-candidate">
+                  <div><b>AS568-{selected.dash}</b><span>ID {selected.idMm.toFixed(2)} × CS {selected.csMm.toFixed(2)} mm</span></div>
+                  <span className={`fit-badge ${selected.state}`}>{selected.label}</span>
+                </div>
+              )}
             </>
           ) : (
             <NoMatch near={result.near} />
@@ -332,25 +317,7 @@ export default function Home() {
           {selected ? (
             <>
               <PlanPreview candidate={selected} input={searchedInput} pressureMode={searchedMode} />
-              <GlandDimensions candidate={selected} compact />
-              <div className="drawing-data">
-                <div><small>선택 오링</small><b>AS568-{selected.dash}</b></div>
-                <div><small>글랜드 단면</small><b>{glandSectionLabel(selected.profile.section)} · {selected.profile.section === "rect" ? "W" : "G"} {selected.profile.section === "rect" ? selected.profile.widthMm.toFixed(2) : selected.profile.mouthWidthMm.toFixed(2)} × {selected.profile.section === "rect" ? "D" : "L"} {selected.profile.depthMm.toFixed(2)} mm</b></div>
-                <div><small>설치 상태</small><b className="accent-text">{selected.label}</b></div>
-              </div>
-              <div className="selection-details">
-                <span>지지벽 <b>{supportWallKo(selected.supportWall)}</b></span>
-                <span>압착률 <b>{selected.profile.squeezePercent.toFixed(1)}%</b></span>
-                <span>오링 설치 중심선 <b>{selected.pathLengthMm.toFixed(2)} mm</b></span>
-                <span>홈 중심 경로 <b>{selected.groovePathLengthMm.toFixed(2)} mm</b></span>
-                {selected.path.shape === "rect" && (
-                  <span>실제 안쪽 R <b>{(selected.path.radius - selected.profile.widthMm / 2).toFixed(2)} mm</b> · 최소 {(3 * selected.csMm).toFixed(2)} / 권장 {(6 * selected.csMm).toFixed(2)} mm</span>
-                )}
-              </div>
-              {selected.warnings.length > 0 && (
-                <div className="preview-warning">{selected.warnings.map((warning) => <p key={warning}>△ {warning}</p>)}</div>
-              )}
-              <button type="button" className="dxf-button" onClick={() => setDxfOpen(true)}>DXF 미리보기 <span>↗</span></button>
+              <button type="button" className="dxf-button" onClick={() => setDxfOpen(true)}>상세 정보 · DXF <span>↗</span></button>
             </>
           ) : (
             <div className="empty-preview"><span>Ø</span><b>생성할 글랜드가 없습니다</b><p>허용 영역을 넓히거나 벽 여유와 형상 치수를 조정해 보세요.</p></div>
@@ -382,6 +349,15 @@ export default function Home() {
 
 function SectionHead({ number, title, subtitle, light = false }: { number: string; title: string; subtitle: string; light?: boolean }) {
   return <div className={`section-head ${light ? "light" : ""}`}><span>{number}</span><div><b>{title}</b><small>{subtitle}</small></div></div>;
+}
+
+function InfoPopover({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <details className="info-popover">
+      <summary aria-label={label} title={label}>?</summary>
+      <div>{children}</div>
+    </details>
+  );
 }
 
 function Dimension({ label, value, onChange }: { label: string; value: number; onChange: (value: number) => void }) {
@@ -439,11 +415,15 @@ export function PlanPreview({ candidate, input, pressureMode, modal = false }: {
         )}
         <line className="center-axis" x1={-extent * 0.55} x2={extent * 0.55} y1="0" y2="0" />
         <PreviewDimensions candidate={candidate} extent={extent} pad={pad} />
-        <line className="pressure-line" x1={pressureStart} x2={pressureEnd} y1={pressureY} y2={pressureY} markerEnd={`url(#${markerId})`} />
-        <text className="pressure-svg-label" x={(pressureStart + pressureEnd) / 2} y={pressureY - 3} textAnchor="middle">오링 이동</text>
+        {modal && <>
+          <line className="pressure-line" x1={pressureStart} x2={pressureEnd} y1={pressureY} y2={pressureY} markerEnd={`url(#${markerId})`} />
+          <text className="pressure-svg-label" x={(pressureStart + pressureEnd) / 2} y={pressureY - 3} textAnchor="middle">오링 이동</text>
+        </>}
       </svg>
-      <div className="pressure-caption"><b>{pressureModeLabel(pressureMode)}</b><span>화살표: 압력에 의한 오링 이동</span><em>도착점: {supportWallKo(candidate.supportWall)}</em></div>
-      <div className="drawing-legend"><span className="legend-inner">금지 경계</span><span className="legend-groove">가공 홈</span><span className="legend-outer">허용 경계</span></div>
+      {modal && <>
+        <div className="pressure-caption"><b>{pressureModeLabel(pressureMode)}</b><span>화살표: 압력에 의한 오링 이동</span><em>도착점: {supportWallKo(candidate.supportWall)}</em></div>
+        <div className="drawing-legend"><span className="legend-inner">금지 경계</span><span className="legend-groove">가공 홈</span><span className="legend-outer">허용 경계</span></div>
+      </>}
     </div>
   );
 }
@@ -553,11 +533,14 @@ function DxfDialog({ candidate, input, pressureMode, medium, onClose, onDownload
               <div><dt>GLAND</dt><dd>{glandSectionLabel(candidate.profile.section)} · {candidate.profile.section === "rect" ? `W ${candidate.profile.widthMm.toFixed(2)}` : `G ${candidate.profile.mouthWidthMm.toFixed(2)} / MAX ${candidate.profile.bottomWidthMm.toFixed(2)}`} × {candidate.profile.section === "rect" ? "D" : "L"} {candidate.profile.depthMm.toFixed(2)} mm</dd></div>
               <div><dt>RANGE</dt><dd>최대폭 {candidate.profile.widthMinMm.toFixed(2)}–{candidate.profile.widthMaxMm.toFixed(2)} / 깊이 {candidate.profile.depthMinMm.toFixed(2)}–{candidate.profile.depthMaxMm.toFixed(2)} mm</dd></div>
               <div><dt>INSTALL</dt><dd>{candidate.label} · {supportWallKo(candidate.supportWall)} 지지</dd></div>
+              <div><dt>SQUEEZE</dt><dd>{candidate.profile.squeezePercent.toFixed(1)}%</dd></div>
+              <div><dt>PATH</dt><dd>오링 설치 중심선 {candidate.pathLengthMm.toFixed(2)} / 홈 중심 경로 {candidate.groovePathLengthMm.toFixed(2)} mm</dd></div>
               <div><dt>MEDIA</dt><dd>{mediumLabel(medium)} · {pressureModeLabel(pressureMode)}</dd></div>
               <div><dt>MATERIAL</dt><dd>FKM (Viton™), hardness/compound TBD</dd></div>
             </dl>
             <GlandDimensions candidate={candidate} />
             <CrossSection candidate={candidate} />
+            {candidate.warnings.length > 0 && <div className="dialog-warning">{candidate.warnings.map((warning) => <p key={warning}>△ {warning}</p>)}</div>}
             <p>가공 전 온도·압력·공차·표면조도와 재질 등급을 제조사 자료로 최종 검토하십시오.</p>
           </div>
         </div>
