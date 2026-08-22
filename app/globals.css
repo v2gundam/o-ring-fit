@@ -37,10 +37,7 @@ legend i { display:inline-block; width:7px; height:7px; margin-right:5px; border
 .condition-row select:disabled { background:#edf0ec; color:#52635c; cursor:not-allowed; }
 .pressure-design-note { display:grid; grid-template-columns:auto 1fr; gap:3px 8px; margin-top:8px; padding:9px 10px; border-left:3px solid var(--blue); background:#eef4f6; font-size:8px; }.pressure-design-note b { color:#315e72; }.pressure-design-note span { color:#526e79; }.pressure-design-note em { grid-column:1/-1; color:#647b83; font-size:7px; font-style:normal; }
 .field-label { margin-top:18px; color:var(--muted); font-size:9px; font-weight:800; letter-spacing:.2px; }.segmented.boundary-shape { padding-top:7px; }
-.groove-position-select { display:block; margin:18px 0 14px; color:var(--muted); font-size:12px; font-weight:700; }
-.groove-position-select select { width:100%; min-height:46px; margin-top:6px; padding:9px 10px; border:1px solid #9faaa5; background:#fff; color:var(--ink); font-size:15px; font-weight:700; }
 .custom-groove-summary { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:9px; }
-.custom-position-input { margin-top:10px; }
 .custom-groove-summary span { display:flex; flex-direction:column; gap:3px; padding:9px 10px; border:1px solid #d8ded9; background:#f1f3ee; color:var(--muted); font-size:12px; }
 .custom-groove-summary b { color:var(--ink); font-size:15px; }
 .design-options { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; padding-top:14px; border-top:1px solid var(--line); }.design-options label { color:var(--muted); font-size:9px; }.design-options select,.number-control { width:100%; min-height:35px; margin-top:5px; border:1px solid var(--line); background:#fff; color:var(--ink); font-size:10px; }.design-options select { padding:8px 7px; }.number-control { display:flex; align-items:center; }.number-control input { width:100%; min-width:0; padding:8px 7px; border:0; outline:0; font-weight:700; }.number-control em { padding-right:8px; color:var(--muted); font-size:8px; font-style:normal; }

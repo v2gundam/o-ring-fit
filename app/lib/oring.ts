@@ -15,12 +15,12 @@ export type SearchOptions = {
   csMm?: number | null;
   glandSection?: GlandSection;
   fixedRoundDiameter?: number;
+  fixedRectSize?: { width: number; height: number };
 };
 
-export type RoundGroovePositionInput = {
-  edge: "inner" | "outer";
-  diameter: number;
-};
+export type GroovePositionInput =
+  | { shape: "round"; edge: "inner" | "outer"; diameter: number }
+  | { shape: "rect"; edge: "inner" | "outer"; width: number; height: number; radius: number };
 
 export type RoundInput = {
   shape: "round";
@@ -179,33 +179,40 @@ export function searchCandidates(input: ShapeInput, medium: Medium, pressureMode
   return { accepted, near: near.slice(0, 5) };
 }
 
-export function searchCandidatesForRoundGroovePosition(envelope: ShapeInput, input: RoundGroovePositionInput, medium: Medium, pressureMode: PressureMode, options: Omit<SearchOptions, "grooveShape" | "grooveRadius" | "fixedRoundDiameter"> = {}) {
+export function searchCandidatesForGroovePosition(envelope: ShapeInput, input: GroovePositionInput, medium: Medium, pressureMode: PressureMode, options: Omit<SearchOptions, "grooveShape" | "grooveRadius" | "fixedRoundDiameter" | "fixedRectSize"> = {}) {
   const accepted: Candidate[] = [];
   const near: NearCandidate[] = [];
-  if (validateRoundGroovePosition(input).length) return { accepted, near };
+  if (validateGroovePosition(input).length) return { accepted, near };
 
   for (const size of AS568_SIZES) {
     if (Number(size.dash) >= 900) continue;
     if (options.csMm && Math.abs(size.csIn * INCH_TO_MM - options.csMm) > 0.03) continue;
     const profile = getGlandProfile(size, medium, options.glandSection ?? "rect");
     if (!profile) continue;
-    const centerDiameter = input.edge === "inner"
-      ? input.diameter + profile.widthMm
-      : input.diameter - profile.widthMm;
-    if (centerDiameter - profile.widthMm <= 0) {
+    const centerDiameter = input.shape === "round"
+      ? input.edge === "inner" ? input.diameter + profile.widthMm : input.diameter - profile.widthMm
+      : null;
+    const centerRect = input.shape === "rect" ? {
+      width: input.edge === "inner" ? input.width + profile.widthMm : input.width - profile.widthMm,
+      height: input.edge === "inner" ? input.height + profile.widthMm : input.height - profile.widthMm,
+    } : null;
+    if ((centerDiameter !== null && centerDiameter - profile.widthMm <= 0)
+      || (centerRect && (centerRect.width - profile.widthMm <= 0 || centerRect.height - profile.widthMm <= 0))) {
       near.push({
         dash: size.dash,
         idMm: size.idIn * INCH_TO_MM,
         csMm: size.csIn * INCH_TO_MM,
         requiredStrain: -1,
-        reason: `입력 홈 외경 ${input.diameter.toFixed(2)} mm에 권장 홈 폭 ${profile.widthMm.toFixed(2)} mm를 적용할 공간이 없습니다.`,
+        reason: `입력한 홈 바깥 형상에 권장 홈 폭 ${profile.widthMm.toFixed(2)} mm를 적용할 공간이 없습니다.`,
       });
       continue;
     }
     const evaluated = evaluateSize(size, profile, envelope, pressureMode, {
       ...options,
-      grooveShape: "round",
-      fixedRoundDiameter: centerDiameter,
+      grooveShape: input.shape,
+      grooveRadius: input.shape === "rect" ? input.radius : undefined,
+      fixedRoundDiameter: centerDiameter ?? undefined,
+      fixedRectSize: centerRect ?? undefined,
     });
     if ("candidate" in evaluated) accepted.push(evaluated.candidate);
     else near.push(evaluated.near);
@@ -235,10 +242,16 @@ export function validateInput(input: ShapeInput): string[] {
   return errors;
 }
 
-export function validateRoundGroovePosition(input: RoundGroovePositionInput): string[] {
-  return Number.isFinite(input.diameter) && input.diameter > 0
-    ? []
-    : [`사용자 지정 홈 ${input.edge === "inner" ? "내경" : "외경"}은 0보다 커야 합니다.`];
+export function validateGroovePosition(input: GroovePositionInput): string[] {
+  if (input.shape === "round") {
+    return Number.isFinite(input.diameter) && input.diameter > 0
+      ? []
+      : [`사용자 지정 홈 ${input.edge === "inner" ? "내경" : "외경"}은 0보다 커야 합니다.`];
+  }
+  const errors: string[] = [];
+  if (![input.width, input.height].every((value) => Number.isFinite(value) && value > 0)) errors.push("사용자 지정 홈 가로와 세로는 0보다 커야 합니다.");
+  if (!Number.isFinite(input.radius) || input.radius <= 0) errors.push("사용자 지정 홈 중심선 R은 0보다 커야 합니다.");
+  return errors;
 }
 
 export function getCornerRadiusGuidance(csMm: number | null, medium: Medium, section: GlandSection): CornerRadiusGuidance | null {
@@ -384,7 +397,9 @@ function solvePath(input: ShapeInput, grooveWidth: number, csMm: number, freeLen
     ? options.fixedRoundDiameter === undefined
       ? solveRoundGroove(input, grooveWidth, targetGrooveLength)
       : solveFixedRoundGroove(input, grooveWidth, options.fixedRoundDiameter)
-    : solveRectGroove(input, grooveWidth, csMm, targetGrooveLength, options.grooveRadius);
+    : options.fixedRectSize === undefined
+      ? solveRectGroove(input, grooveWidth, csMm, targetGrooveLength, options.grooveRadius)
+      : solveFixedRectGroove(input, grooveWidth, csMm, options.fixedRectSize, options.grooveRadius);
   if (!geometry.valid) return geometry;
   const pathLength = supportWall === "GROOVE OD"
     ? geometry.groovePathLength + supportOffset
@@ -423,6 +438,31 @@ function solveFixedRoundGroove(input: ShapeInput, grooveWidth: number, diameter:
 
   const groovePathLength = Math.PI * diameter;
   return { valid: true as const, path: { shape: "round" as const, diameter }, pathLength: groovePathLength, groovePathLength, requiredStrain: 0, innerCornerRatio: null };
+}
+
+function solveFixedRectGroove(input: ShapeInput, grooveWidth: number, csMm: number, size: { width: number; height: number }, requestedRadius?: number) {
+  const innerSafe = expandedInnerBoundary(input);
+  const outerSafe = insetOuterBoundary(input);
+  if (!innerSafe || !outerSafe) return invalid(0, "벽 여유를 적용한 뒤 유효한 허용 영역이 남지 않습니다.");
+
+  const radius = requestedRadius ?? automaticGrooveRadius(input, grooveWidth, csMm);
+  const innerCornerRadius = radius - grooveWidth / 2;
+  if (!Number.isFinite(radius) || radius <= 0) return invalid(0, "둥근 사각형 글랜드의 중심선 R은 0보다 커야 합니다.");
+  if (innerCornerRadius < 3 * csMm) return invalid(0, `홈 안쪽 R ${innerCornerRadius.toFixed(2)} mm가 최소 3×CS인 ${(3 * csMm).toFixed(2)} mm보다 작습니다.`);
+  if (size.width <= 0 || size.height <= 0 || radius * 2 > Math.min(size.width, size.height)) {
+    return invalid(0, "지정한 홈 가로·세로에 비해 중심선 R이 너무 큽니다.");
+  }
+
+  const path: Extract<PathGeometry, { shape: "rect" }> = { shape: "rect", width: size.width, height: size.height, radius };
+  if (!grooveInnerContains(path, grooveWidth, innerSafe)) {
+    return invalid(0, "지정한 둥근 사각형 홈의 안쪽 형상이 금지 경계 또는 안쪽 벽 여유와 간섭합니다.");
+  }
+  if (!grooveOuterInside(path, grooveWidth, outerSafe)) {
+    return invalid(0, "지정한 둥근 사각형 홈의 바깥 형상이 허용 경계 또는 바깥쪽 벽 여유를 벗어납니다.");
+  }
+
+  const groovePathLength = roundedRectPerimeter(path.width, path.height, path.radius);
+  return { valid: true as const, path, pathLength: groovePathLength, groovePathLength, requiredStrain: 0, innerCornerRatio: innerCornerRadius / csMm };
 }
 
 function solveRectGroove(input: ShapeInput, grooveWidth: number, csMm: number, targetGrooveLength: number, requestedRadius?: number) {
