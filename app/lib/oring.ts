@@ -57,6 +57,15 @@ export type GlandProfile = {
   bottomRadiusMm: number;
 };
 
+export type CornerRadiusGuidance = {
+  csMm: number;
+  footprintWidthMm: number;
+  minimumInnerRadiusMm: number;
+  idealInnerRadiusMm: number;
+  minimumCenterlineRadiusMm: number;
+  idealCenterlineRadiusMm: number;
+};
+
 export type PathGeometry =
   | { shape: "round"; diameter: number }
   | { shape: "rect"; width: number; height: number; radius: number };
@@ -167,6 +176,24 @@ export function validateInput(input: ShapeInput): string[] {
   }
   if (!nonNegative(input.innerMargin) || !nonNegative(input.outerMargin)) errors.push("벽 여유는 0 이상이어야 합니다.");
   return errors;
+}
+
+export function getCornerRadiusGuidance(csMm: number | null, medium: Medium, section: GlandSection): CornerRadiusGuidance | null {
+  if (csMm === null || !Number.isFinite(csMm) || csMm <= 0) return null;
+  const size = AS568_SIZES.find((item) => Math.abs(item.csIn * INCH_TO_MM - csMm) < 0.03);
+  if (!size) return null;
+  const profile = getGlandProfile(size, medium, section);
+  if (!profile) return null;
+  const minimumInnerRadiusMm = 3 * profile.csMm;
+  const idealInnerRadiusMm = 6 * profile.csMm;
+  return {
+    csMm: profile.csMm,
+    footprintWidthMm: profile.widthMm,
+    minimumInnerRadiusMm,
+    idealInnerRadiusMm,
+    minimumCenterlineRadiusMm: minimumInnerRadiusMm + profile.widthMm / 2,
+    idealCenterlineRadiusMm: idealInnerRadiusMm + profile.widthMm / 2,
+  };
 }
 
 function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput, pressureMode: PressureMode, options: SearchOptions): { candidate: Candidate } | { near: NearCandidate } {

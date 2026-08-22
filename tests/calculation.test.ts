@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { buildDxf } from "../app/lib/dxf";
-import { searchCandidates, validateInput, type RectInput, type RoundInput } from "../app/lib/oring";
+import { getCornerRadiusGuidance, searchCandidates, validateInput, type RectInput, type RoundInput } from "../app/lib/oring";
 
 const round: RoundInput = {
   shape: "round",
@@ -120,4 +120,17 @@ test("Parker 도브테일과 하프 도브테일 표의 단면 치수를 적용�
   assert.ok(halfProfile.bottomWidthMm > halfProfile.mouthWidthMm);
   assert.equal(fullProfile.angleDeg, 66);
   assert.match(buildDxf(full.accepted[0], wideRound, "internal_vacuum", "vacuum"), /GLAND SECTION: DOVETAIL \/ G/);
+});
+
+test("선택 단면의 실제 안쪽 R과 입력용 중심선 R을 구분해 안내한다", () => {
+  const rectGuide = getCornerRadiusGuidance(3.53, "vacuum", "rect");
+  const dovetailGuide = getCornerRadiusGuidance(3.53, "vacuum", "dovetail");
+  assert.ok(rectGuide);
+  assert.ok(dovetailGuide);
+  assert.ok(Math.abs(rectGuide.csMm - 0.139 * 25.4) < 1e-8);
+  assert.ok(Math.abs(rectGuide.minimumInnerRadiusMm - 3 * rectGuide.csMm) < 1e-8);
+  assert.ok(Math.abs(rectGuide.idealInnerRadiusMm - 6 * rectGuide.csMm) < 1e-8);
+  assert.ok(Math.abs(rectGuide.minimumCenterlineRadiusMm - (3 * rectGuide.csMm + rectGuide.footprintWidthMm / 2)) < 1e-8);
+  assert.ok(rectGuide.idealCenterlineRadiusMm > rectGuide.minimumCenterlineRadiusMm);
+  assert.ok(dovetailGuide.minimumCenterlineRadiusMm > rectGuide.minimumCenterlineRadiusMm);
 });

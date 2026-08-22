@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { buildDxf, downloadDxf } from "./lib/dxf";
 import {
+  getCornerRadiusGuidance,
   searchCandidates,
   validateInput,
   type Candidate,
@@ -61,6 +62,17 @@ export default function Home() {
   const selected = result.accepted.find((item) => item.dash === selectedDash) ?? result.accepted[0] ?? null;
   const currentInput: ShapeInput = shape === "round" ? round : rect;
   const resolvedGrooveShape: GrooveShape = grooveMode === "auto" ? shape : grooveMode;
+  const cornerRadiusGuidance = useMemo(
+    () => resolvedGrooveShape === "rect" ? getCornerRadiusGuidance(csFilter, medium, glandSection) : null,
+    [resolvedGrooveShape, csFilter, medium, glandSection],
+  );
+  const cornerRadiusState = cornerRadiusGuidance
+    ? grooveRadius < cornerRadiusGuidance.minimumCenterlineRadiusMm
+      ? "invalid"
+      : grooveRadius < cornerRadiusGuidance.idealCenterlineRadiusMm
+        ? "conditional"
+        : "ideal"
+    : "auto";
   const dxf = useMemo(
     () => selected ? buildDxf(selected, searchedInput, searchedMode, searchedMedium) : "",
     [selected, searchedInput, searchedMode, searchedMedium],
@@ -189,6 +201,26 @@ export default function Home() {
             )}
           </div>
 
+          {resolvedGrooveShape === "rect" && (
+            <div className={`radius-guide ${cornerRadiusState}`} role="status" aria-live="polite">
+              {cornerRadiusGuidance ? (
+                <>
+                  <div className="radius-guide-head">
+                    <b>모서리 R 기준 · CS {cornerRadiusGuidance.csMm.toFixed(2)} mm</b>
+                    <span>{cornerRadiusState === "invalid" ? "입력 R 부족" : cornerRadiusState === "conditional" ? "최소 기준 충족" : "이상적 기준 충족"}</span>
+                  </div>
+                  <div className="radius-guide-values">
+                    <span><small>실제 홈 안쪽 R</small><b>최소 {cornerRadiusGuidance.minimumInnerRadiusMm.toFixed(2)} mm</b><em>권장 {cornerRadiusGuidance.idealInnerRadiusMm.toFixed(2)} mm</em></span>
+                    <span><small>입력할 중심선 R</small><b>최소 {cornerRadiusGuidance.minimumCenterlineRadiusMm.toFixed(2)} mm</b><em>권장 {cornerRadiusGuidance.idealCenterlineRadiusMm.toFixed(2)} mm</em></span>
+                  </div>
+                  <p>중심선 R = 실제 안쪽 R + 홈 최대 폭 {cornerRadiusGuidance.footprintWidthMm.toFixed(2)} mm ÷ 2</p>
+                </>
+              ) : (
+                <><b>단면 두께를 선택하면 최소 모서리 R을 계산합니다.</b><span>자동 선택 중에는 각 후보별로 3×CS 기준을 검사합니다.</span></>
+              )}
+            </div>
+          )}
+
           <div className="auto-shape-note">
             <b>{shape === "round" ? "원형" : "둥근 사각형"} 허용 영역</b>
             <span>→</span>
@@ -276,6 +308,9 @@ export default function Home() {
                 <span>지지벽 <b>{supportWallKo(selected.supportWall)}</b></span>
                 <span>압착률 <b>{selected.profile.squeezePercent.toFixed(1)}%</b></span>
                 <span>중심 경로 <b>{selected.pathLengthMm.toFixed(2)} mm</b></span>
+                {selected.path.shape === "rect" && (
+                  <span>실제 안쪽 R <b>{(selected.path.radius - selected.profile.widthMm / 2).toFixed(2)} mm</b> · 최소 {(3 * selected.csMm).toFixed(2)} / 권장 {(6 * selected.csMm).toFixed(2)} mm</span>
+                )}
               </div>
               {selected.warnings.length > 0 && (
                 <div className="preview-warning">{selected.warnings.map((warning) => <p key={warning}>△ {warning}</p>)}</div>

@@ -20,6 +20,13 @@
 - 단면 각도는 66°이며 평균 홈 직경은 평균 오링 직경과 일치시킨다.
 - 공식 근거: [Parker Dovetail and Half-Dovetail Design Charts](https://www.parker.com/content/dam/Parker-com/Literature/O-Ring-Division-Literature/O-Ring-ehandbook-pdfs/Dovetail-and-half-dovetail-design-charts.pdf)
 
+### 비원형 홈의 모서리 반경 안내
+
+- Parker는 직사각형 면 씰 홈의 실제 안쪽 모서리 반경을 최소 `3 × CS`, 이상적으로 `6 × CS`로 권고한다. 이보다 작은 반경은 코너에서 오링의 좌굴·주름과 설치 어려움을 키울 수 있다.
+- 앱의 `홈 중심선 모서리 R` 입력값은 실제 안쪽 가공 모서리와 다르다. 따라서 `중심선 R = 실제 안쪽 R + 홈 최대 폭 ÷ 2`로 변환해 최소·권장 입력값을 표시한다.
+- 도브테일과 하프 도브테일은 평면상 최대 바닥 폭을 홈 최대 폭으로 사용한다.
+- 공식 근거: [Parker O-Ring Handbook ORD 5700](https://www.parker.com/content/dam/Parker-com/Literature/O-Ring-Division-Literature/ORD-5700.pdf), [Parker O-Ring FAQ](https://www.parker.com/Literature/O-Ring%20Division%20Literature/FAQ.pdf)
+
 ## 2. 자료 신뢰도 원칙
 
 자료는 다음 우선순위로 사용한다.
