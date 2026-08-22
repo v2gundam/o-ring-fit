@@ -244,9 +244,9 @@ footer { font-size:11px; line-height:1.5; }
   .preview{order:-2;position:sticky;z-index:30;top:0;grid-column:auto;align-self:start;min-height:0;padding:10px 14px 12px;border-bottom:1px solid #476059;box-shadow:0 10px 24px rgba(8,28,23,.22)}
   .inputs{order:-1}.results{order:0}
   .preview-top{align-items:center}.preview .section-head{padding-bottom:7px}.drawing-status{font-size:9px;padding:0}
-  .preview>.drawing.functional{min-height:210px;height:210px;margin:3px 0 0}
+  .preview>.drawing.functional{min-height:168px;height:168px;margin:3px 0 0}
   .preview .dxf-button{min-height:42px;margin-top:5px}
-  .empty-preview{min-height:210px;padding:18px}
+  .empty-preview{min-height:168px;padding:14px}
   .preview-dimensions text{font-size:5.3px}.preview-dimensions .radius-summary{font-size:5px}
   .basis-bar,body>.basis-bar{display:none}
   .shell>footer{display:none}
