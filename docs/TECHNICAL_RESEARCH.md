@@ -11,6 +11,15 @@
 
 이 문서는 설계 표준 자체를 대체하지 않는다. 실제 수치 데이터베이스를 배포하기 전에는 최신 유료 규격, 제조사 적용 조건, 데이터 재배포 권한 및 실제 시험 결과를 별도로 확인해야 한다.
 
+### 도브테일 및 하프 도브테일 유지 홈
+
+- Parker O-Ring Handbook Design Chart 4-4와 4-5를 MVP 치수 근거로 사용한다.
+- 도브테일은 조립·정비 중 오링을 유지하는 데 유용하지만 가공비가 높고 일반적으로 권장되는 기본 홈은 아니다.
+- 제한된 빈 공간 때문에 넓은 온도 범위, 일반 공차 극단 또는 높은 엘라스토머 팽윤을 허용하기 어렵다.
+- 입구 반경 `R`은 설치 손상과 압출 위험에 직접 영향을 주므로 표의 고정값을 사용한다.
+- 단면 각도는 66°이며 평균 홈 직경은 평균 오링 직경과 일치시킨다.
+- 공식 근거: [Parker Dovetail and Half-Dovetail Design Charts](https://www.parker.com/content/dam/Parker-com/Literature/O-Ring-Division-Literature/O-Ring-ehandbook-pdfs/Dovetail-and-half-dovetail-design-charts.pdf)
+
 ## 2. 자료 신뢰도 원칙
 
 자료는 다음 우선순위로 사용한다.

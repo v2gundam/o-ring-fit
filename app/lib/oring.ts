@@ -7,11 +7,13 @@ const MAX_CIRCUMFERENTIAL_COMPRESSION = 0.03;
 export type PressureMode = "internal_pressure" | "internal_vacuum" | "external_pressure";
 export type Medium = "liquid" | "gas" | "vacuum";
 export type GrooveShape = "round" | "rect";
+export type GlandSection = "rect" | "dovetail" | "half_dovetail";
 
 export type SearchOptions = {
   grooveShape?: GrooveShape;
   grooveRadius?: number;
   csMm?: number | null;
+  glandSection?: GlandSection;
 };
 
 export type RoundInput = {
@@ -37,6 +39,7 @@ export type RectInput = {
 export type ShapeInput = RoundInput | RectInput;
 
 export type GlandProfile = {
+  section: GlandSection;
   csMm: number;
   widthMm: number;
   widthMinMm: number;
@@ -47,6 +50,11 @@ export type GlandProfile = {
   radiusMinMm: number;
   radiusMaxMm: number;
   squeezePercent: number;
+  mouthWidthMm: number;
+  bottomWidthMm: number;
+  angleDeg: number | null;
+  cornerRadiusMm: number;
+  bottomRadiusMm: number;
 };
 
 export type PathGeometry =
@@ -91,12 +99,36 @@ type InchProfile = {
   radius: [number, number];
 };
 
+type DovetailInchProfile = {
+  depth: [number, number];
+  mouthWidth: [number, number];
+  squeeze: number;
+  radius: number;
+  bottomRadius: number;
+};
+
 const FACE_SEAL_PROFILES: Record<string, InchProfile> = {
   "0.070": { depth: [0.050, 0.054], liquidWidth: [0.101, 0.107], gasWidth: [0.084, 0.089], radius: [0.005, 0.015] },
   "0.103": { depth: [0.074, 0.080], liquidWidth: [0.136, 0.142], gasWidth: [0.120, 0.125], radius: [0.005, 0.015] },
   "0.139": { depth: [0.101, 0.107], liquidWidth: [0.177, 0.187], gasWidth: [0.158, 0.164], radius: [0.010, 0.025] },
   "0.210": { depth: [0.152, 0.162], liquidWidth: [0.270, 0.290], gasWidth: [0.239, 0.244], radius: [0.020, 0.035] },
   "0.275": { depth: [0.201, 0.211], liquidWidth: [0.342, 0.362], gasWidth: [0.309, 0.314], radius: [0.020, 0.035] },
+};
+
+const DOVETAIL_PROFILES: Record<string, DovetailInchProfile> = {
+  "0.070": { depth: [0.053, 0.055], mouthWidth: [0.057, 0.061], squeeze: 23, radius: 0.005, bottomRadius: 1 / 64 },
+  "0.103": { depth: [0.081, 0.083], mouthWidth: [0.083, 0.087], squeeze: 21, radius: 0.010, bottomRadius: 1 / 64 },
+  "0.139": { depth: [0.111, 0.113], mouthWidth: [0.113, 0.117], squeeze: 20, radius: 0.010, bottomRadius: 1 / 32 },
+  "0.210": { depth: [0.171, 0.173], mouthWidth: [0.171, 0.175], squeeze: 18, radius: 0.015, bottomRadius: 1 / 32 },
+  "0.275": { depth: [0.231, 0.234], mouthWidth: [0.231, 0.235], squeeze: 16, radius: 0.015, bottomRadius: 1 / 16 },
+};
+
+const HALF_DOVETAIL_PROFILES: Record<string, DovetailInchProfile> = {
+  "0.070": { depth: [0.053, 0.055], mouthWidth: [0.064, 0.066], squeeze: 23, radius: 0.005, bottomRadius: 1 / 64 },
+  "0.103": { depth: [0.083, 0.085], mouthWidth: [0.095, 0.097], squeeze: 19, radius: 0.010, bottomRadius: 1 / 64 },
+  "0.139": { depth: [0.113, 0.115], mouthWidth: [0.124, 0.128], squeeze: 18, radius: 0.010, bottomRadius: 1 / 32 },
+  "0.210": { depth: [0.173, 0.176], mouthWidth: [0.190, 0.193], squeeze: 17, radius: 0.015, bottomRadius: 1 / 32 },
+  "0.275": { depth: [0.234, 0.238], mouthWidth: [0.255, 0.257], squeeze: 15, radius: 0.015, bottomRadius: 1 / 16 },
 };
 
 export function searchCandidates(input: ShapeInput, medium: Medium, pressureMode: PressureMode, options: SearchOptions = {}) {
@@ -106,7 +138,7 @@ export function searchCandidates(input: ShapeInput, medium: Medium, pressureMode
   for (const size of AS568_SIZES) {
     if (Number(size.dash) >= 900) continue;
     if (options.csMm && Math.abs(size.csIn * INCH_TO_MM - options.csMm) > 0.03) continue;
-    const profile = getGlandProfile(size, medium);
+    const profile = getGlandProfile(size, medium, options.glandSection ?? "rect");
     if (!profile) continue;
     const evaluated = evaluateSize(size, profile, input, pressureMode, options);
     if ("candidate" in evaluated) accepted.push(evaluated.candidate);
@@ -162,6 +194,8 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
   }
 
   const warnings: string[] = [];
+  if (profile.section === "dovetail") warnings.push("도브테일은 유지가 꼭 필요한 경우에만 사용하고 온도·팽윤·공차를 별도 검토해야 합니다.");
+  if (profile.section === "half_dovetail") warnings.push("하프 도브테일은 유지 방향과 압력 지지벽 방향을 가공 전 확인해야 합니다.");
   const ratio = geometry.innerCornerRatio;
   if (ratio !== null && ratio < 6) warnings.push(`안쪽 R이 CS의 ${ratio.toFixed(1)}배로 이상적 기준 6배보다 작습니다.`);
   if (Math.abs(strain) > 0.03) warnings.push("설치 변형률이 권장 범위 상단에 가깝습니다.");
@@ -409,17 +443,49 @@ function strainReason(value: number, shape: string) {
     : `${shape} 허용 영역에 넣으려면 과도한 둘레 압축이 필요합니다.`;
 }
 
-function getGlandProfile(size: As568Size, medium: Medium): GlandProfile | null {
+function getGlandProfile(size: As568Size, medium: Medium, section: GlandSection): GlandProfile | null {
   const key = size.csIn.toFixed(3);
+  const csMm = size.csIn * INCH_TO_MM;
+  if (section !== "rect") {
+    const source = section === "dovetail" ? DOVETAIL_PROFILES[key] : HALF_DOVETAIL_PROFILES[key];
+    if (!source) return null;
+    const angleDeg = 66;
+    const sideCount = section === "dovetail" ? 2 : 1;
+    const tangent = Math.tan(angleDeg * Math.PI / 180);
+    const bottomWidthIn: [number, number] = [
+      source.mouthWidth[0] + sideCount * source.depth[0] / tangent,
+      source.mouthWidth[1] + sideCount * source.depth[1] / tangent,
+    ];
+    const depthMm = average(source.depth) * INCH_TO_MM;
+    return {
+      section,
+      csMm,
+      widthMm: average(bottomWidthIn) * INCH_TO_MM,
+      widthMinMm: bottomWidthIn[0] * INCH_TO_MM,
+      widthMaxMm: bottomWidthIn[1] * INCH_TO_MM,
+      depthMm,
+      depthMinMm: source.depth[0] * INCH_TO_MM,
+      depthMaxMm: source.depth[1] * INCH_TO_MM,
+      radiusMinMm: source.radius * INCH_TO_MM,
+      radiusMaxMm: source.radius * INCH_TO_MM,
+      squeezePercent: source.squeeze,
+      mouthWidthMm: average(source.mouthWidth) * INCH_TO_MM,
+      bottomWidthMm: average(bottomWidthIn) * INCH_TO_MM,
+      angleDeg,
+      cornerRadiusMm: source.radius * INCH_TO_MM,
+      bottomRadiusMm: source.bottomRadius * INCH_TO_MM,
+    };
+  }
   const source = FACE_SEAL_PROFILES[key];
   if (!source) return null;
   const widthIn = medium === "liquid" ? source.liquidWidth : source.gasWidth;
   const depthIn = source.depth;
-  const csMm = size.csIn * INCH_TO_MM;
   const depthMm = average(depthIn) * INCH_TO_MM;
+  const widthMm = average(widthIn) * INCH_TO_MM;
   return {
+    section,
     csMm,
-    widthMm: average(widthIn) * INCH_TO_MM,
+    widthMm,
     widthMinMm: widthIn[0] * INCH_TO_MM,
     widthMaxMm: widthIn[1] * INCH_TO_MM,
     depthMm,
@@ -428,6 +494,11 @@ function getGlandProfile(size: As568Size, medium: Medium): GlandProfile | null {
     radiusMinMm: source.radius[0] * INCH_TO_MM,
     radiusMaxMm: source.radius[1] * INCH_TO_MM,
     squeezePercent: (1 - depthMm / csMm) * 100,
+    mouthWidthMm: widthMm,
+    bottomWidthMm: widthMm,
+    angleDeg: null,
+    cornerRadiusMm: average(source.radius) * INCH_TO_MM,
+    bottomRadiusMm: average(source.radius) * INCH_TO_MM,
   };
 }
 

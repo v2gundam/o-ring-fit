@@ -6,6 +6,7 @@ import {
   searchCandidates,
   validateInput,
   type Candidate,
+  type GlandSection,
   type GrooveShape,
   type Medium,
   type PressureMode,
@@ -48,6 +49,7 @@ export default function Home() {
   const [grooveMode, setGrooveMode] = useState<"auto" | GrooveShape>("auto");
   const [grooveRadius, setGrooveRadius] = useState(20);
   const [csFilter, setCsFilter] = useState<number | null>(null);
+  const [glandSection, setGlandSection] = useState<GlandSection>("rect");
   const [result, setResult] = useState(initialSearch);
   const [selectedDash, setSelectedDash] = useState(initialSearch.accepted[0]?.dash ?? "");
   const [errors, setErrors] = useState<string[]>([]);
@@ -76,6 +78,7 @@ export default function Home() {
       grooveShape: resolvedGrooveShape,
       grooveRadius: resolvedGrooveShape === "rect" ? grooveRadius : undefined,
       csMm: csFilter,
+      glandSection,
     });
     setResult(next);
     setSelectedDash(next.accepted[0]?.dash ?? "");
@@ -172,8 +175,15 @@ export default function Home() {
                 <option value="rect">둥근 사각형</option>
               </select>
             </label>
+            <label>홈 단면
+              <select value={glandSection} onChange={(event) => setGlandSection(event.target.value as GlandSection)}>
+                <option value="rect">직사각형 · 표준</option>
+                <option value="dovetail">도브테일 · 양쪽 유지</option>
+                <option value="half_dovetail">하프 도브테일 · 한쪽 유지</option>
+              </select>
+            </label>
             {resolvedGrooveShape === "rect" && (
-              <label>홈 중심선 모서리 R
+              <label className="radius-option">홈 중심선 모서리 R
                 <span className="number-control"><input type="number" min="0.1" step="0.5" value={grooveRadius} onChange={(event) => setGrooveRadius(event.target.valueAsNumber)} /><em>mm</em></span>
               </label>
             )}
@@ -185,6 +195,9 @@ export default function Home() {
             <b>{resolvedGrooveShape === "round" ? "원형 홈" : "둥근 사각형 홈"}</b>
             {grooveMode === "auto" && <em>자동 적용</em>}
           </div>
+          {glandSection !== "rect" && (
+            <div className="retention-note"><b>{glandSection === "dovetail" ? "도브테일" : "하프 도브테일"} 유지 홈</b><span>Parker 66° 단면 · 금속 간 접촉 기준</span><em>온도 범위·FKM 팽윤·가공 공차 추가 검토</em></div>
+          )}
 
           <div className="condition-row">
             <label>압력 방향
@@ -256,7 +269,7 @@ export default function Home() {
               <GlandDimensions candidate={selected} compact />
               <div className="drawing-data">
                 <div><small>선택 오링</small><b>AS568-{selected.dash}</b></div>
-                <div><small>글랜드 W × D</small><b>{selected.profile.widthMm.toFixed(2)} × {selected.profile.depthMm.toFixed(2)} mm</b></div>
+                <div><small>글랜드 단면</small><b>{glandSectionLabel(selected.profile.section)} · {selected.profile.section === "rect" ? "W" : "G"} {selected.profile.section === "rect" ? selected.profile.widthMm.toFixed(2) : selected.profile.mouthWidthMm.toFixed(2)} × {selected.profile.section === "rect" ? "D" : "L"} {selected.profile.depthMm.toFixed(2)} mm</b></div>
                 <div><small>설치 상태</small><b className="accent-text">{selected.label}</b></div>
               </div>
               <div className="selection-details">
@@ -427,6 +440,7 @@ function PreviewDimensions({ candidate, extent, pad }: { candidate: Candidate; e
 
 function GlandDimensions({ candidate, compact = false }: { candidate: Candidate; compact?: boolean }) {
   const grooveWidth = candidate.profile.widthMm;
+  const sectionLabel = glandSectionLabel(candidate.profile.section);
   const profile = candidate.path.shape === "round"
     ? [
         ["홈 내경", `Ø ${(candidate.path.diameter - grooveWidth).toFixed(2)} mm`],
@@ -440,9 +454,13 @@ function GlandDimensions({ candidate, compact = false }: { candidate: Candidate;
       ];
   return (
     <div className={`gland-dimension-card ${compact ? "compact" : ""}`}>
-      <div className="dimension-card-title"><b>글랜드 가공 치수</b><span>단위 mm</span></div>
+      <div className="dimension-card-title"><b>글랜드 가공 치수 · {sectionLabel}</b><span>단위 mm</span></div>
       <div className="plan-dimension-grid">{profile.map(([label, value]) => <span key={label}><small>{label}</small><b>{value}</b></span>)}</div>
-      <div className="section-dimension-line"><span>홈 폭 <b>{grooveWidth.toFixed(2)}</b></span><span>홈 깊이 <b>{candidate.profile.depthMm.toFixed(2)}</b></span><span>바닥 R <b>{candidate.profile.radiusMinMm.toFixed(2)}–{candidate.profile.radiusMaxMm.toFixed(2)}</b></span></div>
+      {candidate.profile.section === "rect" ? (
+        <div className="section-dimension-line"><span>홈 폭 <b>{grooveWidth.toFixed(2)}</b></span><span>홈 깊이 <b>{candidate.profile.depthMm.toFixed(2)}</b></span><span>바닥 R <b>{candidate.profile.radiusMinMm.toFixed(2)}–{candidate.profile.radiusMaxMm.toFixed(2)}</b></span></div>
+      ) : (
+        <div className="section-dimension-line"><span>입구폭 G <b>{candidate.profile.mouthWidthMm.toFixed(2)}</b></span><span>최대 바닥폭 <b>{candidate.profile.bottomWidthMm.toFixed(2)}</b></span><span>깊이 L <b>{candidate.profile.depthMm.toFixed(2)}</b></span><span>벽 각도 <b>{candidate.profile.angleDeg}°</b></span><span>R / R1 <b>{candidate.profile.cornerRadiusMm.toFixed(2)} / {candidate.profile.bottomRadiusMm.toFixed(2)}</b></span></div>
+      )}
     </div>
   );
 }
@@ -459,8 +477,8 @@ function DxfDialog({ candidate, input, pressureMode, medium, onClose, onDownload
             <dl>
               <div><dt>O-RING</dt><dd>AS568-{candidate.dash}{candidate.aliases.length ? ` · ${candidate.aliases.join(", ")}` : ""}</dd></div>
               <div><dt>SIZE</dt><dd>ID {candidate.idMm.toFixed(2)} × CS {candidate.csMm.toFixed(2)} mm</dd></div>
-              <div><dt>GLAND</dt><dd>W {candidate.profile.widthMm.toFixed(2)} × D {candidate.profile.depthMm.toFixed(2)} mm</dd></div>
-              <div><dt>RANGE</dt><dd>W {candidate.profile.widthMinMm.toFixed(2)}–{candidate.profile.widthMaxMm.toFixed(2)} / D {candidate.profile.depthMinMm.toFixed(2)}–{candidate.profile.depthMaxMm.toFixed(2)} mm</dd></div>
+              <div><dt>GLAND</dt><dd>{glandSectionLabel(candidate.profile.section)} · {candidate.profile.section === "rect" ? `W ${candidate.profile.widthMm.toFixed(2)}` : `G ${candidate.profile.mouthWidthMm.toFixed(2)} / MAX ${candidate.profile.bottomWidthMm.toFixed(2)}`} × {candidate.profile.section === "rect" ? "D" : "L"} {candidate.profile.depthMm.toFixed(2)} mm</dd></div>
+              <div><dt>RANGE</dt><dd>최대폭 {candidate.profile.widthMinMm.toFixed(2)}–{candidate.profile.widthMaxMm.toFixed(2)} / 깊이 {candidate.profile.depthMinMm.toFixed(2)}–{candidate.profile.depthMaxMm.toFixed(2)} mm</dd></div>
               <div><dt>INSTALL</dt><dd>{candidate.label} · {supportWallKo(candidate.supportWall)} 지지</dd></div>
               <div><dt>MEDIA</dt><dd>{mediumLabel(medium)} · {pressureModeLabel(pressureMode)}</dd></div>
               <div><dt>MATERIAL</dt><dd>FKM (Viton™), hardness/compound TBD</dd></div>
@@ -479,14 +497,21 @@ function DxfDialog({ candidate, input, pressureMode, medium, onClose, onDownload
 function CrossSection({ candidate }: { candidate: Candidate }) {
   const width = candidate.profile.widthMm;
   const depth = candidate.profile.depthMm;
+  const section = candidate.profile.section;
+  const groovePath = section === "dovetail"
+    ? "M12 18 H91 Q88 18 86 23 L62 70 H198 L174 23 Q172 18 169 18 H248"
+    : section === "half_dovetail"
+      ? "M12 18 H86 V70 H198 L174 23 Q172 18 169 18 H248"
+      : "M12 18 H70 V70 H190 V18 H248";
   return (
     <div className="section-sketch">
       <svg viewBox="0 0 260 92" role="img" aria-label="글랜드 단면">
-        <path d="M12 18 H70 V70 H190 V18 H248" />
+        <path d={groovePath} />
         <ellipse cx="130" cy="42" rx="46" ry="26" />
         <line x1="70" y1="82" x2="190" y2="82" /><line x1="70" y1="77" x2="70" y2="87" /><line x1="190" y1="77" x2="190" y2="87" />
-        <text x="130" y="90" textAnchor="middle">W {width.toFixed(2)} mm</text>
-        <text x="196" y="51">D {depth.toFixed(2)} mm</text>
+        <text x="130" y="90" textAnchor="middle">{section === "rect" ? "W" : "MAX"} {width.toFixed(2)} mm</text>
+        <text x="200" y="51">{section === "rect" ? "D" : "L"} {depth.toFixed(2)} mm</text>
+        {section !== "rect" && <><text x="130" y="15" textAnchor="middle">G {candidate.profile.mouthWidthMm.toFixed(2)} mm</text><text x="70" y="54">66°</text></>}
       </svg>
     </div>
   );
@@ -499,3 +524,4 @@ function pressureModeLabel(value: PressureMode) {
   return "내부 진공";
 }
 function mediumLabel(value: Medium) { return value === "liquid" ? "액체" : value === "gas" ? "기체" : "진공/기체"; }
+function glandSectionLabel(value: GlandSection) { return value === "dovetail" ? "도브테일" : value === "half_dovetail" ? "하프 도브테일" : "직사각형"; }

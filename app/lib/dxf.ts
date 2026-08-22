@@ -26,22 +26,37 @@ export function buildDxf(candidate: Candidate, input: ExportInput, pressureMode:
   addText(entities, "NOTES", noteX, topY, 3.5, `O-RING: AS568-${candidate.dash} / ID ${fmt(candidate.idMm)} x CS ${fmt(candidate.csMm)} mm`);
   addText(entities, "NOTES", noteX, topY - 6, 3.0, "MATERIAL: FKM (VITON) / HARDNESS: TBD");
   addText(entities, "DIMENSIONS", noteX, topY - 12, 3.0, planDimensionNote(candidate));
-  addText(entities, "DIMENSIONS", noteX, topY - 18, 3.0, `GLAND SECTION: WIDTH ${fmt(width)} / DEPTH ${fmt(candidate.profile.depthMm)} mm`);
+  addText(entities, "DIMENSIONS", noteX, topY - 18, 3.0, sectionDimensionNote(candidate));
   addText(entities, "NOTES", noteX, topY - 24, 3.0, `INSTALL: ${candidate.label.toUpperCase()} / SQUEEZE ${candidate.profile.squeezePercent.toFixed(1)}%`);
   addText(entities, "PRESSURE", noteX, topY - 30, 3.0, `O-RING MOVEMENT: ${pressureMode.toUpperCase()} / SUPPORT: ${candidate.supportWall}`);
-  addText(entities, "NOTES", noteX, topY - 36, 2.5, "REFERENCE: PARKER ORD 5700 FACE SEAL PROFILE / VERIFY BEFORE MACHINING");
+  addText(entities, "NOTES", noteX, topY - 36, 2.5, `REFERENCE: PARKER ORD 5700 ${candidate.profile.section === "rect" ? "FACE SEAL" : "DOVETAIL"} PROFILE / VERIFY BEFORE MACHINING`);
 
   const sectionX = noteX;
   const sectionY = -bounds / 2 + 18;
   const sectionScale = 5;
   const w = width * sectionScale;
   const d = candidate.profile.depthMm * sectionScale;
-  addLine(entities, "SECTION", sectionX, sectionY, sectionX + w + 26, sectionY);
-  addLine(entities, "SECTION", sectionX + 12, sectionY, sectionX + 12, sectionY - d);
-  addLine(entities, "SECTION", sectionX + 12, sectionY - d, sectionX + 12 + w, sectionY - d);
-  addLine(entities, "SECTION", sectionX + 12 + w, sectionY - d, sectionX + 12 + w, sectionY);
+  const centerX = sectionX + 12 + w / 2;
+  const bottomLeft = centerX - w / 2;
+  const bottomRight = centerX + w / 2;
+  const mouthWidth = candidate.profile.mouthWidthMm * sectionScale;
+  const mouthLeft = centerX - mouthWidth / 2;
+  const mouthRight = centerX + mouthWidth / 2;
+  addLine(entities, "SECTION", sectionX, sectionY, mouthLeft, sectionY);
+  if (candidate.profile.section === "rect") {
+    addLine(entities, "SECTION", mouthLeft, sectionY, bottomLeft, sectionY - d);
+    addLine(entities, "SECTION", bottomRight, sectionY - d, mouthRight, sectionY);
+  } else if (candidate.profile.section === "dovetail") {
+    addLine(entities, "SECTION", mouthLeft, sectionY, bottomLeft, sectionY - d);
+    addLine(entities, "SECTION", bottomRight, sectionY - d, mouthRight, sectionY);
+  } else {
+    addLine(entities, "SECTION", mouthLeft, sectionY, mouthLeft, sectionY - d);
+    addLine(entities, "SECTION", bottomRight, sectionY - d, mouthRight, sectionY);
+  }
+  addLine(entities, "SECTION", bottomLeft, sectionY - d, bottomRight, sectionY - d);
+  addLine(entities, "SECTION", mouthRight, sectionY, sectionX + w + 26, sectionY);
   addText(entities, "SECTION", sectionX, sectionY + 5, 3, "SECTION A-A");
-  addText(entities, "DIMENSIONS", sectionX + 12, sectionY - d - 5, 2.7, `W ${fmt(width)} / D ${fmt(candidate.profile.depthMm)} mm`);
+  addText(entities, "DIMENSIONS", sectionX + 12, sectionY - d - 5, 2.7, candidate.profile.section === "rect" ? `W ${fmt(width)} / D ${fmt(candidate.profile.depthMm)} mm` : `G ${fmt(candidate.profile.mouthWidthMm)} / MAX ${fmt(width)} / L ${fmt(candidate.profile.depthMm)} / 66 DEG`);
 
   return [
     "0", "SECTION", "2", "HEADER",
@@ -105,4 +120,11 @@ function planDimensionNote(candidate: Candidate) {
     return `GLAND PLAN: ID ${fmt(candidate.path.diameter - width)} / CENTER DIA ${fmt(candidate.path.diameter)} / OD ${fmt(candidate.path.diameter + width)} mm`;
   }
   return `GLAND PLAN IN W${fmt(candidate.path.width - width)} H${fmt(candidate.path.height - width)} R${fmt(candidate.path.radius - width / 2)} / CENTER W${fmt(candidate.path.width)} H${fmt(candidate.path.height)} R${fmt(candidate.path.radius)} / OUT W${fmt(candidate.path.width + width)} H${fmt(candidate.path.height + width)} R${fmt(candidate.path.radius + width / 2)} mm`;
+}
+
+function sectionDimensionNote(candidate: Candidate) {
+  const profile = candidate.profile;
+  if (profile.section === "rect") return `GLAND SECTION: RECT / WIDTH ${fmt(profile.widthMm)} / DEPTH ${fmt(profile.depthMm)} mm`;
+  const label = profile.section === "dovetail" ? "DOVETAIL" : "HALF DOVETAIL";
+  return `GLAND SECTION: ${label} / G ${fmt(profile.mouthWidthMm)} / MAX ${fmt(profile.bottomWidthMm)} / L ${fmt(profile.depthMm)} / ANGLE ${profile.angleDeg} DEG / R ${fmt(profile.cornerRadiusMm)} / R1 ${fmt(profile.bottomRadiusMm)} mm`;
 }
