@@ -394,7 +394,7 @@ export function PlanPreview({ candidate, input, pressureMode, modal = false }: {
           <rect className="groove-svg" data-preview-shape="groove-rect" x={-candidate.path.width / 2} y={-candidate.path.height / 2} width={candidate.path.width} height={candidate.path.height} rx={candidate.path.radius} strokeWidth={candidate.profile.widthMm} />
         )}
         <line className="center-axis" x1={-extent * 0.55} x2={extent * 0.55} y1="0" y2="0" />
-        <PreviewDimensions candidate={candidate} extent={extent} pad={pad} />
+        <PreviewDimensions candidate={candidate} extent={extent} pad={pad} compact={!modal} />
         {modal && <>
           <line className="pressure-line" x1={pressureStart} x2={pressureEnd} y1={pressureY} y2={pressureY} markerEnd={`url(#${markerId})`} />
           <text className="pressure-svg-label" x={(pressureStart + pressureEnd) / 2} y={pressureY - 3} textAnchor="middle">오링 이동</text>
@@ -408,15 +408,15 @@ export function PlanPreview({ candidate, input, pressureMode, modal = false }: {
   );
 }
 
-function PreviewDimensions({ candidate, extent, pad }: { candidate: Candidate; extent: number; pad: number }) {
+function PreviewDimensions({ candidate, extent, pad, compact = false }: { candidate: Candidate; extent: number; pad: number; compact?: boolean }) {
   const grooveWidth = candidate.profile.widthMm;
   const spacing = Math.max(14, pad * 0.22);
-  const top = -extent / 2 - pad + 5;
+  const top = -extent / 2 - pad + 16;
   if (candidate.path.shape === "round") {
     const dimensions = [
-      { label: "홈 내경", diameter: candidate.path.diameter - grooveWidth, className: "inner-gland-dim" },
-      { label: "홈 중심경", diameter: candidate.path.diameter, className: "center-gland-dim" },
-      { label: "홈 외경", diameter: candidate.path.diameter + grooveWidth, className: "outer-gland-dim" },
+      { label: "홈 내경", shortLabel: "내경", diameter: candidate.path.diameter - grooveWidth, className: "inner-gland-dim" },
+      { label: "홈 중심경", shortLabel: "중심", diameter: candidate.path.diameter, className: "center-gland-dim" },
+      { label: "홈 외경", shortLabel: "외경", diameter: candidate.path.diameter + grooveWidth, className: "outer-gland-dim" },
     ];
     return (
       <g className="preview-dimensions">
@@ -429,7 +429,7 @@ function PreviewDimensions({ candidate, extent, pad }: { candidate: Candidate; e
               <line x1={-radius} x2={-radius} y1={-extent * 0.12} y2={y + 2} />
               <line x1={radius} x2={radius} y1={-extent * 0.12} y2={y + 2} />
               <path d={`M ${-radius} ${y} l 3.5 -1.8 v 3.6 Z M ${radius} ${y} l -3.5 -1.8 v 3.6 Z`} />
-              <text x="0" y={y - 2.2} textAnchor="middle">{dimension.label} Ø {dimension.diameter.toFixed(2)} mm</text>
+              <text x="0" y={y - 1} textAnchor="middle">{compact ? `${dimension.shortLabel} Ø${dimension.diameter.toFixed(2)}` : `${dimension.label} Ø ${dimension.diameter.toFixed(2)} mm`}</text>
             </g>
           );
         })}
@@ -455,17 +455,19 @@ function PreviewDimensions({ candidate, extent, pad }: { candidate: Candidate; e
             <line x1={-dimension.width / 2} x2={-dimension.width / 2} y1={-dimension.height / 2} y2={y + 2} />
             <line x1={dimension.width / 2} x2={dimension.width / 2} y1={-dimension.height / 2} y2={y + 2} />
             <path d={`M ${-dimension.width / 2} ${y} l 3.5 -1.8 v 3.6 Z M ${dimension.width / 2} ${y} l -3.5 -1.8 v 3.6 Z`} />
-            <text x="0" y={y - 2.2} textAnchor="middle">홈 {dimension.label} W {dimension.width.toFixed(2)}</text>
+            <text x="0" y={y - 1} textAnchor="middle">{compact ? `${dimension.label} W${dimension.width.toFixed(2)}` : `홈 ${dimension.label} W ${dimension.width.toFixed(2)}`}</text>
             <line x1={x} x2={x} y1={-dimension.height / 2} y2={dimension.height / 2} />
             <line x1={dimension.width / 2} x2={x - 2} y1={-dimension.height / 2} y2={-dimension.height / 2} />
             <line x1={dimension.width / 2} x2={x - 2} y1={dimension.height / 2} y2={dimension.height / 2} />
             <path d={`M ${x} ${-dimension.height / 2} l -1.8 3.5 h 3.6 Z M ${x} ${dimension.height / 2} l -1.8 -3.5 h 3.6 Z`} />
-            <text x={x + 3} y="0" textAnchor="middle" transform={`rotate(90 ${x + 3} 0)`}>{dimension.label} H {dimension.height.toFixed(2)}</text>
+            <text x={x + 3} y="0" textAnchor="middle" transform={`rotate(90 ${x + 3} 0)`}>{compact ? `${dimension.label} H${dimension.height.toFixed(2)}` : `${dimension.label} H ${dimension.height.toFixed(2)}`}</text>
           </g>
         );
       })}
       <text className="radius-summary" x="0" y={extent / 2 + pad * 0.62} textAnchor="middle">
-        홈 R · 안쪽 {dimensions[0].radius.toFixed(2)} / 중심 {dimensions[1].radius.toFixed(2)} / 바깥 {dimensions[2].radius.toFixed(2)} mm
+        {compact
+          ? `R 내${dimensions[0].radius.toFixed(2)} / 중${dimensions[1].radius.toFixed(2)} / 외${dimensions[2].radius.toFixed(2)}`
+          : `홈 R · 안쪽 ${dimensions[0].radius.toFixed(2)} / 중심 ${dimensions[1].radius.toFixed(2)} / 바깥 ${dimensions[2].radius.toFixed(2)} mm`}
       </text>
     </g>
   );

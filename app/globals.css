@@ -251,7 +251,7 @@ footer { font-size:11px; line-height:1.5; }
   .preview>.drawing.functional{min-height:132px;height:132px;margin:0}
   .preview .dxf-button{min-height:44px;margin-top:5px}
   .empty-preview{min-height:132px;padding:10px}
-  .preview-dimensions text{font-size:14px;stroke-width:2.6px}.preview-dimensions .radius-summary{font-size:13px}
+  .preview-dimensions text{font-size:13px;stroke-width:2.5px}.preview-dimensions .radius-summary{font-size:12.5px}
   .basis-bar,body>.basis-bar{display:none}
   .shell>footer{display:none}
   .plan-dimension-grid{grid-template-columns:1fr}
