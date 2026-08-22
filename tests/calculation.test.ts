@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildDxf } from "../app/lib/dxf";
-import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForRoundGroove, validateCustomRoundGroove, validateInput, type RectInput, type RoundInput } from "../app/lib/oring";
+import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForRoundGroovePosition, validateInput, validateRoundGroovePosition, type RectInput, type RoundInput } from "../app/lib/oring";
 import Home, { PlanPreview } from "../app/page";
 
 const round: RoundInput = {
@@ -88,33 +88,37 @@ test("선정 오링의 ID와 CS로 자유 길이를 다시 계산해 최종 적�
   }
 });
 
-test("사용자 지정 원형 홈 내경·외경에서 홈 폭과 길이를 모두 만족하는 후보를 찾는다", () => {
+test("사용자 지정 원형 홈 내경 또는 외경을 고정하고 반대쪽 치수를 자동 계산한다", () => {
   for (const [medium, pressureMode] of [["vacuum", "internal_vacuum"], ["gas", "internal_pressure"]] as const) {
     const designed = searchCandidates(round, medium, pressureMode, { grooveShape: "round", csMm: 3.53 }).accepted[0];
     assert.ok(designed);
     assert.equal(designed.path.shape, "round");
     if (designed.path.shape !== "round") continue;
-    const groove = {
-      innerDiameter: designed.path.diameter - designed.profile.widthMm,
-      outerDiameter: designed.path.diameter + designed.profile.widthMm,
-    };
-    const result = searchCandidatesForRoundGroove(groove, medium, pressureMode, { csMm: 3.53, glandSection: "rect" });
-    const matched = result.accepted.find((candidate) => candidate.dash === designed.dash);
-    assert.ok(matched);
-    assert.equal(matched.path.shape, "round");
-    if (matched.path.shape !== "round") continue;
-    assert.ok(Math.abs((matched.path.diameter - matched.profile.widthMm) - groove.innerDiameter) < 1e-9);
-    assert.ok(Math.abs((matched.path.diameter + matched.profile.widthMm) - groove.outerDiameter) < 1e-9);
-    assert.equal(matched.lengthCheck.withinLimits, true);
+    const positions = [
+      { edge: "inner" as const, diameter: designed.path.diameter - designed.profile.widthMm },
+      { edge: "outer" as const, diameter: designed.path.diameter + designed.profile.widthMm },
+    ];
+    for (const position of positions) {
+      const result = searchCandidatesForRoundGroovePosition(position, medium, pressureMode, { csMm: 3.53, glandSection: "rect" });
+      const matched = result.accepted.find((candidate) => candidate.dash === designed.dash);
+      assert.ok(matched);
+      assert.equal(matched.path.shape, "round");
+      if (matched.path.shape !== "round") continue;
+      const actualDiameter = position.edge === "inner"
+        ? matched.path.diameter - matched.profile.widthMm
+        : matched.path.diameter + matched.profile.widthMm;
+      assert.ok(Math.abs(actualDiameter - position.diameter) < 1e-9);
+      assert.equal(matched.lengthCheck.withinLimits, true);
+    }
   }
 });
 
-test("사용자 지정 홈의 입력 오류와 권장 폭 이탈을 구분한다", () => {
-  assert.ok(validateCustomRoundGroove({ innerDiameter: 120, outerDiameter: 110 }).length > 0);
-  const tooWide = searchCandidatesForRoundGroove({ innerDiameter: 100, outerDiameter: 120 }, "vacuum", "internal_vacuum", { csMm: 3.53 });
-  assert.equal(tooWide.accepted.length, 0);
-  assert.ok(tooWide.near.length > 0);
-  assert.match(tooWide.near[0].reason, /홈 폭|권장 범위/);
+test("사용자 지정 홈 위치의 잘못된 지름과 외경 공간 부족을 검출한다", () => {
+  assert.ok(validateRoundGroovePosition({ edge: "inner", diameter: 0 }).length > 0);
+  const tooSmall = searchCandidatesForRoundGroovePosition({ edge: "outer", diameter: 1 }, "vacuum", "internal_vacuum", { csMm: 3.53 });
+  assert.equal(tooSmall.accepted.length, 0);
+  assert.ok(tooSmall.near.length > 0);
+  assert.match(tooSmall.near[0].reason, /권장 홈 폭|공간/);
 });
 
 test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한다", () => {
@@ -195,7 +199,9 @@ test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 �
   assert.match(homeMarkup, /aria-label="추천 오링 형번 선택"/);
   assert.match(homeMarkup, /적합 오링 형번/);
   assert.match(homeMarkup, /입력과 동시에 자동 계산됩니다/);
-  assert.match(homeMarkup, /홈 내·외경으로 검색/);
+  assert.match(homeMarkup, /aria-label="오링 홈 위치 선택"/);
+  assert.match(homeMarkup, /사용자 지정\(내경\)/);
+  assert.match(homeMarkup, /사용자 지정\(외경\)/);
   assert.doesNotMatch(homeMarkup, /표준 오링 후보 찾기/);
   assert.doesNotMatch(homeMarkup, /class="candidate-list"/);
   const selectStart = homeMarkup.indexOf('aria-label="추천 오링 형번 선택"');
