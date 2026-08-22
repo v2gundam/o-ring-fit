@@ -182,6 +182,8 @@ footer { font-size:11px; line-height:1.5; }
 .input-meta { display:flex; align-items:center; flex-wrap:wrap; gap:7px 12px; margin-top:10px; padding:9px 10px; border:1px solid #d8ded9; background:#f1f3ee; color:var(--muted); font-size:11px; }
 .input-meta>span+span { padding-left:12px; border-left:1px solid #cbd3ce; }
 .input-meta .info-popover { margin-left:auto; }
+.live-calculation { display:flex; align-items:center; gap:7px; margin-top:10px; color:#4b6c61; font-size:12px; font-weight:700; }
+.live-calculation span { color:#4c9a78; font-size:10px; }
 .candidate-count { display:flex; align-items:baseline; gap:8px; margin-top:20px; padding:12px 14px; border-left:3px solid var(--orange); background:#fff5ee; }
 .candidate-count b { color:var(--orange-dark); font:600 24px/1 Georgia,serif; }
 .candidate-count span { color:var(--muted); font-size:12px; }
@@ -239,15 +241,16 @@ footer { font-size:11px; line-height:1.5; }
   .input-meta{margin-top:8px;padding:8px 9px;font-size:12px}
   .inline-warning{padding:9px 10px;font-size:13px}
   .search-button,.dxf-button{min-height:48px;margin-top:10px;padding:11px 14px;font-size:16px}
+  .live-calculation{font-size:13px}
   .candidate-count{margin-top:12px;padding:9px 11px}.candidate-count b{font-size:24px}.candidate-count span{font-size:13px}
   .candidate-select{margin-top:10px;font-size:13px}.candidate-select select{min-height:48px;font-size:16px}
   .selected-candidate{padding:10px}.selected-candidate>div b{font-size:19px}.selected-candidate>div span{font-size:12px}
   .preview{order:-2;position:sticky;z-index:30;top:0;grid-column:auto;align-self:start;min-height:0;padding:10px 14px 12px;border-bottom:1px solid #476059;box-shadow:0 10px 24px rgba(8,28,23,.22)}
   .inputs{order:-1}.results{order:0}
-  .preview-top{align-items:center}.preview .section-head{padding-bottom:7px}.drawing-status{font-size:11px;padding:0}
-  .preview>.drawing.functional{min-height:168px;height:168px;margin:3px 0 0}
+  .preview-top{display:none}
+  .preview>.drawing.functional{min-height:132px;height:132px;margin:0}
   .preview .dxf-button{min-height:44px;margin-top:5px}
-  .empty-preview{min-height:168px;padding:14px}
+  .empty-preview{min-height:132px;padding:10px}
   .preview-dimensions text{font-size:6.2px}.preview-dimensions .radius-summary{font-size:5.8px}
   .basis-bar,body>.basis-bar{display:none}
   .shell>footer{display:none}

@@ -133,6 +133,8 @@ test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 �
   const homeMarkup = renderToStaticMarkup(createElement(Home));
   assert.match(homeMarkup, /aria-label="추천 오링 형번 선택"/);
   assert.match(homeMarkup, /적합 오링 형번/);
+  assert.match(homeMarkup, /입력과 동시에 자동 계산됩니다/);
+  assert.doesNotMatch(homeMarkup, /표준 오링 후보 찾기/);
   assert.doesNotMatch(homeMarkup, /class="candidate-list"/);
   const selectStart = homeMarkup.indexOf('aria-label="추천 오링 형번 선택"');
   const selectEnd = homeMarkup.indexOf("</select>", selectStart);

@@ -55,18 +55,29 @@ export default function Home() {
   const [grooveRadius, setGrooveRadius] = useState(20);
   const [csFilter, setCsFilter] = useState<number | null>(null);
   const [glandSection, setGlandSection] = useState<GlandSection>("rect");
-  const [result, setResult] = useState(initialSearch);
   const [selectedDash, setSelectedDash] = useState(sortByDash(initialSearch.accepted)[0]?.dash ?? "");
-  const [errors, setErrors] = useState<string[]>([]);
-  const [searchedInput, setSearchedInput] = useState<ShapeInput>(initialRound);
-  const [searchedMode, setSearchedMode] = useState<PressureMode>(initialMode);
-  const [searchedMedium, setSearchedMedium] = useState<Medium>(initialMedium);
   const [dxfOpen, setDxfOpen] = useState(false);
 
-  const orderedCandidates = useMemo(() => sortByDash(result.accepted), [result.accepted]);
-  const selected = orderedCandidates.find((item) => item.dash === selectedDash) ?? orderedCandidates[0] ?? null;
   const currentInput: ShapeInput = shape === "round" ? round : rect;
   const resolvedGrooveShape: GrooveShape = grooveMode === "auto" ? shape : grooveMode;
+  const errors = useMemo(() => {
+    const nextErrors = validateInput(currentInput);
+    if (resolvedGrooveShape === "rect" && (!Number.isFinite(grooveRadius) || grooveRadius <= 0)) {
+      nextErrors.push("둥근 사각형 홈의 중심선 R은 0보다 커야 합니다.");
+    }
+    return nextErrors;
+  }, [currentInput, resolvedGrooveShape, grooveRadius]);
+  const result = useMemo<ReturnType<typeof searchCandidates>>(
+    () => errors.length ? { accepted: [], near: [] } : searchCandidates(currentInput, medium, pressureMode, {
+      grooveShape: resolvedGrooveShape,
+      grooveRadius: resolvedGrooveShape === "rect" ? grooveRadius : undefined,
+      csMm: csFilter,
+      glandSection,
+    }),
+    [currentInput, medium, pressureMode, resolvedGrooveShape, grooveRadius, csFilter, glandSection, errors.length],
+  );
+  const orderedCandidates = useMemo(() => sortByDash(result.accepted), [result.accepted]);
+  const selected = orderedCandidates.find((item) => item.dash === selectedDash) ?? orderedCandidates[0] ?? null;
   const cornerRadiusGuidance = useMemo(
     () => resolvedGrooveShape === "rect" ? getCornerRadiusGuidance(csFilter, medium, glandSection) : null,
     [resolvedGrooveShape, csFilter, medium, glandSection],
@@ -79,34 +90,9 @@ export default function Home() {
         : "ideal"
     : "auto";
   const dxf = useMemo(
-    () => selected ? buildDxf(selected, searchedInput, searchedMode, searchedMedium) : "",
-    [selected, searchedInput, searchedMode, searchedMedium],
+    () => selected ? buildDxf(selected, currentInput, pressureMode, medium) : "",
+    [selected, currentInput, pressureMode, medium],
   );
-
-  function runSearchFor(nextPressureMode: PressureMode, nextMedium: Medium, nextGlandSection: GlandSection = glandSection) {
-    const nextErrors = validateInput(currentInput);
-    if (resolvedGrooveShape === "rect" && (!Number.isFinite(grooveRadius) || grooveRadius <= 0)) {
-      nextErrors.push("둥근 사각형 홈의 중심선 R은 0보다 커야 합니다.");
-    }
-    setErrors(nextErrors);
-    setDxfOpen(false);
-    if (nextErrors.length) return;
-    const next = searchCandidates(currentInput, nextMedium, nextPressureMode, {
-      grooveShape: resolvedGrooveShape,
-      grooveRadius: resolvedGrooveShape === "rect" ? grooveRadius : undefined,
-      csMm: csFilter,
-      glandSection: nextGlandSection,
-    });
-    setResult(next);
-    setSelectedDash(sortByDash(next.accepted)[0]?.dash ?? "");
-    setSearchedInput(currentInput);
-    setSearchedMode(nextPressureMode);
-    setSearchedMedium(nextMedium);
-  }
-
-  function runSearch() {
-    runSearchFor(pressureMode, medium);
-  }
 
   function setRoundValue(key: keyof RoundInput, value: number) {
     setRound((previous) => ({ ...previous, [key]: value }));
@@ -120,17 +106,6 @@ export default function Home() {
     const nextMedium: Medium = nextMode === "internal_vacuum" ? "vacuum" : medium === "vacuum" ? "gas" : medium;
     setPressureMode(nextMode);
     setMedium(nextMedium);
-    runSearchFor(nextMode, nextMedium);
-  }
-
-  function setMediumAndSearch(nextMedium: Medium) {
-    setMedium(nextMedium);
-    runSearchFor(pressureMode, nextMedium);
-  }
-
-  function setGlandSectionAndSearch(nextSection: GlandSection) {
-    setGlandSection(nextSection);
-    runSearchFor(pressureMode, medium, nextSection);
   }
 
   function exportDxf() {
@@ -226,7 +201,7 @@ export default function Home() {
               </select>
             </label>
             <label>홈 단면
-              <select value={glandSection} onChange={(event) => setGlandSectionAndSearch(event.target.value as GlandSection)}>
+              <select value={glandSection} onChange={(event) => setGlandSection(event.target.value as GlandSection)}>
                 <option value="rect">직사각</option>
                 <option value="dovetail">도브</option>
                 <option value="half_dovetail_inner">하프 도브 내측</option>
@@ -255,7 +230,7 @@ export default function Home() {
               </select>
             </label>
             <label>매체 / 홈 폭 기준
-              <select value={medium} disabled={pressureMode === "internal_vacuum"} onChange={(event) => setMediumAndSearch(event.target.value as Medium)}>
+              <select value={medium} disabled={pressureMode === "internal_vacuum"} onChange={(event) => setMedium(event.target.value as Medium)}>
                 {pressureMode === "internal_vacuum" ? <option value="vacuum">진공 · 좁은 홈</option> : <>
                   <option value="gas">기체 · 좁은 홈</option>
                   <option value="liquid">액체 · 팽윤 여유 홈</option>
@@ -276,7 +251,7 @@ export default function Home() {
             </InfoPopover>
           </div>
           {errors.length > 0 && <div className="error-box" role="alert">{errors.map((error) => <p key={error}>{error}</p>)}</div>}
-          <button type="button" className="search-button" onClick={runSearch}>표준 오링 후보 찾기 <span>→</span></button>
+          <div className="live-calculation" aria-live="polite"><span>●</span> 입력과 동시에 자동 계산됩니다.</div>
         </section>
 
         <section className="results">
@@ -321,7 +296,7 @@ export default function Home() {
 
           {selected ? (
             <>
-              <PlanPreview candidate={selected} input={searchedInput} pressureMode={searchedMode} />
+              <PlanPreview candidate={selected} input={currentInput} pressureMode={pressureMode} />
               <button type="button" className="dxf-button" onClick={() => setDxfOpen(true)}>상세 정보 · DXF <span>↗</span></button>
             </>
           ) : (
@@ -341,9 +316,9 @@ export default function Home() {
       {dxfOpen && selected && (
         <DxfDialog
           candidate={selected}
-          input={searchedInput}
-          pressureMode={searchedMode}
-          medium={searchedMedium}
+          input={currentInput}
+          pressureMode={pressureMode}
+          medium={medium}
           onClose={() => setDxfOpen(false)}
           onDownload={exportDxf}
         />
