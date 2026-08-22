@@ -35,6 +35,16 @@ npm test
 
 이 명령은 배포 빌드와 함께 원형·둥근 사각형 공간 제약, 변형률 한계, 압력별 지지벽, 후보 없음 상태, DXF 단위와 폐곡선 형식을 시험합니다.
 
+## GitHub Pages
+
+GitHub Pages용 정적 파일은 다음 명령으로 생성합니다.
+
+```bash
+npm run build:pages
+```
+
+결과는 `dist-pages`에 생성됩니다. `main` 브랜치에 푸시하면 `.github/workflows/pages.yml`이 이 정적 빌드를 GitHub Pages에 자동 배포합니다. 비공개 저장소의 Pages 사용에는 GitHub Pro, Team 또는 Enterprise 요금제가 필요하며, Enterprise 접근 제어를 사용하지 않는 Pages 사이트는 저장소가 비공개여도 인터넷에 공개됩니다.
+
 ## 설계 문서
 
 - [제품 요구사항](docs/PRODUCT_REQUIREMENTS.md)
