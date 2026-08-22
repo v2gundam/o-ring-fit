@@ -43,7 +43,7 @@ GitHub Pages용 정적 파일은 다음 명령으로 생성합니다.
 npm run build:pages
 ```
 
-결과는 `dist-pages`에 생성됩니다. `main` 브랜치에 푸시하면 `.github/workflows/pages.yml`이 이 정적 빌드를 GitHub Pages에 자동 배포합니다. 비공개 저장소의 Pages 사용에는 GitHub Pro, Team 또는 Enterprise 요금제가 필요하며, Enterprise 접근 제어를 사용하지 않는 Pages 사이트는 저장소가 비공개여도 인터넷에 공개됩니다.
+결과는 `dist-pages`에 생성됩니다. `main` 브랜치에 푸시하면 `.github/workflows/pages.yml`이 정적 사이트를 다시 빌드해 GitHub Pages에 자동 배포합니다.
 
 ## 설계 문서
 
