@@ -241,9 +241,12 @@ footer { font-size:11px; line-height:1.5; }
   .candidate-count{margin-top:12px;padding:8px 11px}.candidate-count b{font-size:20px}.candidate-count span{font-size:11px}
   .candidate-select{margin-top:10px;font-size:11px}.candidate-select select{min-height:44px;font-size:13px}
   .selected-candidate{padding:9px 10px}.selected-candidate>div b{font-size:16px}.selected-candidate>div span{font-size:10px}
-  .preview{grid-column:auto;min-height:0}
-  .preview-top{align-items:center}.drawing-status{font-size:9px;padding:0}
-  .preview>.drawing.functional{min-height:300px;margin:6px 0 2px}
+  .preview{order:-2;position:sticky;z-index:30;top:0;grid-column:auto;align-self:start;min-height:0;padding:10px 14px 12px;border-bottom:1px solid #476059;box-shadow:0 10px 24px rgba(8,28,23,.22)}
+  .inputs{order:-1}.results{order:0}
+  .preview-top{align-items:center}.preview .section-head{padding-bottom:7px}.drawing-status{font-size:9px;padding:0}
+  .preview>.drawing.functional{min-height:210px;height:210px;margin:3px 0 0}
+  .preview .dxf-button{min-height:42px;margin-top:5px}
+  .empty-preview{min-height:210px;padding:18px}
   .preview-dimensions text{font-size:5.3px}.preview-dimensions .radius-summary{font-size:5px}
   .basis-bar,body>.basis-bar{display:none}
   .shell>footer{display:none}
