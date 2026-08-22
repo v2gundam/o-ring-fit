@@ -1,8 +1,6 @@
-import type { Candidate, Medium, PressureMode, RectInput, RoundInput } from "./oring";
+import { getEnvelopeBoundaries, type Candidate, type Medium, type PressureMode, type ShapeInput } from "./oring";
 
-type ExportInput = RoundInput | RectInput;
-
-export function buildDxf(candidate: Candidate, input: ExportInput, pressureMode: PressureMode, medium: Medium) {
+export function buildDxf(candidate: Candidate, input: ShapeInput, pressureMode: PressureMode, medium: Medium) {
   const layers = [
     ["GROOVE_CUT", 1], ["GROOVE_CENTER", 3], ["DIMENSIONS", 7],
     ["NOTES", 7], ["PRESSURE", 6], ["SECTION", 4],
@@ -20,7 +18,8 @@ export function buildDxf(candidate: Candidate, input: ExportInput, pressureMode:
     addRoundedPolyline(entities, "GROOVE_CENTER", candidate.path.width, candidate.path.height, candidate.path.radius, "CENTER");
   }
 
-  const bounds = input.shape === "round" ? input.outerDiameter : Math.max(input.outerWidth, input.outerHeight);
+  const outerBoundary = getEnvelopeBoundaries(input).outer;
+  const bounds = outerBoundary.shape === "round" ? outerBoundary.diameter : Math.max(outerBoundary.width, outerBoundary.height);
   const noteX = bounds / 2 + 18;
   const topY = bounds / 2;
   addText(entities, "NOTES", noteX, topY, 3.5, `O-RING: AS568-${candidate.dash} / ID ${fmt(candidate.idMm)} x CS ${fmt(candidate.csMm)} mm`);

@@ -3,6 +3,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { buildDxf, downloadDxf } from "./lib/dxf";
 import {
+  getEnvelopeBoundaries,
   getCornerRadiusGuidance,
   searchCandidates,
   searchCandidatesForGroovePosition,
@@ -12,6 +13,7 @@ import {
   type GlandSection,
   type GrooveShape,
   type Medium,
+  type MixedInput,
   type PressureMode,
   type RectInput,
   type RoundInput,
@@ -49,7 +51,8 @@ function sortByDash<T extends { dash: string }>(items: readonly T[]) {
 
 export default function Home() {
   const [groovePositionMode, setGroovePositionMode] = useState<"auto" | "custom_inner" | "custom_outer">("auto");
-  const [shape, setShape] = useState<"round" | "rect">("round");
+  const [innerBoundaryShape, setInnerBoundaryShape] = useState<"round" | "rect">("round");
+  const [outerBoundaryShape, setOuterBoundaryShape] = useState<"round" | "rect">("round");
   const [round, setRound] = useState(initialRound);
   const [rect, setRect] = useState(initialRect);
   const [customInnerDiameter, setCustomInnerDiameter] = useState(107.67);
@@ -60,7 +63,7 @@ export default function Home() {
   const [customOuterHeight, setCustomOuterHeight] = useState(130);
   const [pressureMode, setPressureMode] = useState<PressureMode>(initialMode);
   const [medium, setMedium] = useState<Medium>(initialMedium);
-  const [grooveMode, setGrooveMode] = useState<"auto" | GrooveShape>("auto");
+  const [grooveMode, setGrooveMode] = useState<GrooveShape>("round");
   const [grooveRadius, setGrooveRadius] = useState(20);
   const [csFilter, setCsFilter] = useState<number | null>(null);
   const [glandSection, setGlandSection] = useState<GlandSection>("rect");
@@ -68,8 +71,18 @@ export default function Home() {
   const [dxfOpen, setDxfOpen] = useState(false);
 
   const customGrooveMode = groovePositionMode !== "auto";
-  const currentInput = useMemo<ShapeInput>(() => shape === "round" ? round : rect, [shape, round, rect]);
-  const resolvedGrooveShape: GrooveShape = grooveMode === "auto" ? shape : grooveMode;
+  const currentInput = useMemo<MixedInput>(() => ({
+    shape: "mixed",
+    innerBoundary: innerBoundaryShape === "round"
+      ? { shape: "round", diameter: round.innerDiameter }
+      : { shape: "rect", width: rect.innerWidth, height: rect.innerHeight, radius: rect.innerRadius },
+    outerBoundary: outerBoundaryShape === "round"
+      ? { shape: "round", diameter: round.outerDiameter }
+      : { shape: "rect", width: rect.outerWidth, height: rect.outerHeight, radius: rect.outerRadius },
+    innerMargin: innerBoundaryShape === "round" ? round.innerMargin : rect.innerMargin,
+    outerMargin: outerBoundaryShape === "round" ? round.outerMargin : rect.outerMargin,
+  }), [innerBoundaryShape, outerBoundaryShape, round, rect]);
+  const resolvedGrooveShape: GrooveShape = grooveMode;
   const customGroovePosition = useMemo(() => {
     const edge = groovePositionMode === "custom_outer" ? "outer" as const : "inner" as const;
     return resolvedGrooveShape === "round"
@@ -193,46 +206,42 @@ export default function Home() {
         <section className="inputs">
           <SectionHead number="01" title="허용 영역" subtitle="글랜드 전체가 존재할 수 있는 범위와 위치" />
 
-          <div className="field-label">허용 영역 형상</div>
-          <div className="segmented boundary-shape" aria-label="허용 영역 형상 선택">
-            <button type="button" className={shape === "round" ? "active" : ""} onClick={() => setShape("round")}>○ 원형</button>
-            <button type="button" className={shape === "rect" ? "active" : ""} onClick={() => setShape("rect")}>▢ 둥근 사각형</button>
-          </div>
-
-          {shape === "round" ? (
-            <div className="input-groups single">
-              <fieldset>
-                <legend><i className="inner-dot" /> 안쪽 금지 / 바깥쪽 허용</legend>
-                <div className="dimension-grid">
+          <div className="input-groups boundary-groups">
+            <fieldset>
+              <legend><i className="inner-dot" /> 안쪽 금지 경계</legend>
+              <div className="segmented boundary-shape" aria-label="안쪽 금지 경계 형상 선택">
+                <button type="button" aria-pressed={innerBoundaryShape === "round"} className={innerBoundaryShape === "round" ? "active" : ""} onClick={() => setInnerBoundaryShape("round")}>○ 원형</button>
+                <button type="button" aria-pressed={innerBoundaryShape === "rect"} className={innerBoundaryShape === "rect" ? "active" : ""} onClick={() => setInnerBoundaryShape("rect")}>▢ 사각형</button>
+              </div>
+              <div className="dimension-grid">
+                {innerBoundaryShape === "round" ? (
                   <Dimension label="챔버 내경" value={round.innerDiameter} onChange={(value) => setRoundValue("innerDiameter", value)} />
-                  <Dimension label="플랜지 외경" value={round.outerDiameter} onChange={(value) => setRoundValue("outerDiameter", value)} />
-                  <Dimension label="안쪽 벽 여유" value={round.innerMargin} onChange={(value) => setRoundValue("innerMargin", value)} />
-                  <Dimension label="바깥쪽 벽 여유" value={round.outerMargin} onChange={(value) => setRoundValue("outerMargin", value)} />
-                </div>
-              </fieldset>
-            </div>
-          ) : (
-            <div className="input-groups">
-              <fieldset>
-                <legend><i className="inner-dot" /> 안쪽 금지 경계</legend>
-                <div className="dimension-grid">
+                ) : <>
                   <Dimension label="가로" value={rect.innerWidth} onChange={(value) => setRectValue("innerWidth", value)} />
                   <Dimension label="세로" value={rect.innerHeight} onChange={(value) => setRectValue("innerHeight", value)} />
                   <Dimension label="모서리 R" value={rect.innerRadius} onChange={(value) => setRectValue("innerRadius", value)} />
-                  <Dimension label="벽 여유" value={rect.innerMargin} onChange={(value) => setRectValue("innerMargin", value)} />
-                </div>
-              </fieldset>
-              <fieldset>
-                <legend><i className="outer-dot" /> 바깥쪽 허용 경계</legend>
-                <div className="dimension-grid">
+                </>}
+                <Dimension label="벽 여유" value={innerBoundaryShape === "round" ? round.innerMargin : rect.innerMargin} onChange={(value) => innerBoundaryShape === "round" ? setRoundValue("innerMargin", value) : setRectValue("innerMargin", value)} />
+              </div>
+            </fieldset>
+            <fieldset>
+              <legend><i className="outer-dot" /> 바깥쪽 허용 경계</legend>
+              <div className="segmented boundary-shape" aria-label="바깥쪽 허용 경계 형상 선택">
+                <button type="button" aria-pressed={outerBoundaryShape === "round"} className={outerBoundaryShape === "round" ? "active" : ""} onClick={() => setOuterBoundaryShape("round")}>○ 원형</button>
+                <button type="button" aria-pressed={outerBoundaryShape === "rect"} className={outerBoundaryShape === "rect" ? "active" : ""} onClick={() => setOuterBoundaryShape("rect")}>▢ 사각형</button>
+              </div>
+              <div className="dimension-grid">
+                {outerBoundaryShape === "round" ? (
+                  <Dimension label="플랜지 외경" value={round.outerDiameter} onChange={(value) => setRoundValue("outerDiameter", value)} />
+                ) : <>
                   <Dimension label="가로" value={rect.outerWidth} onChange={(value) => setRectValue("outerWidth", value)} />
                   <Dimension label="세로" value={rect.outerHeight} onChange={(value) => setRectValue("outerHeight", value)} />
                   <Dimension label="모서리 R" value={rect.outerRadius} onChange={(value) => setRectValue("outerRadius", value)} />
-                  <Dimension label="벽 여유" value={rect.outerMargin} onChange={(value) => setRectValue("outerMargin", value)} />
-                </div>
-              </fieldset>
-            </div>
-          )}
+                </>}
+                <Dimension label="벽 여유" value={outerBoundaryShape === "round" ? round.outerMargin : rect.outerMargin} onChange={(value) => outerBoundaryShape === "round" ? setRoundValue("outerMargin", value) : setRectValue("outerMargin", value)} />
+              </div>
+            </fieldset>
+          </div>
 
           <div className="design-options">
             <label>오링 단면 두께 (CS)
@@ -242,8 +251,7 @@ export default function Home() {
               </select>
             </label>
             <label>오링 홈 형상
-              <select value={grooveMode} onChange={(event) => setGrooveMode(event.target.value as "auto" | GrooveShape)}>
-                <option value="auto">자동 · 허용 영역과 동일</option>
+              <select value={grooveMode} onChange={(event) => setGrooveMode(event.target.value as GrooveShape)}>
                 <option value="round">원형</option>
                 <option value="rect">둥근 사각형</option>
               </select>
@@ -317,7 +325,7 @@ export default function Home() {
             </label>
           </div>
           <div className="input-meta">
-            <span>{customGrooveMode ? <><b>사용자 지정 {resolvedGrooveShape === "round" ? "원형" : "둥근 사각형"} 홈</b> → {groovePositionMode === "custom_inner" ? (resolvedGrooveShape === "round" ? "내경 고정" : "안쪽 형상 고정") : (resolvedGrooveShape === "round" ? "외경 고정" : "바깥쪽 형상 고정")}</> : <><b>{shape === "round" ? "원형" : "둥근 사각형"}</b> → {resolvedGrooveShape === "round" ? "원형 홈" : "둥근 사각형 홈"}</>}</span>
+            <span>{customGrooveMode ? <><b>사용자 지정 {resolvedGrooveShape === "round" ? "원형" : "둥근 사각형"} 홈</b> → {groovePositionMode === "custom_inner" ? (resolvedGrooveShape === "round" ? "내경 고정" : "안쪽 형상 고정") : (resolvedGrooveShape === "round" ? "외경 고정" : "바깥쪽 형상 고정")}</> : <><b>안쪽 {innerBoundaryShape === "round" ? "원형" : "사각형"} · 바깥쪽 {outerBoundaryShape === "round" ? "원형" : "사각형"}</b> → {resolvedGrooveShape === "round" ? "원형 홈" : "둥근 사각형 홈"}</>}</span>
             <span><b>FKM</b> · Viton™</span>
             <InfoPopover label="설계 조건 설명">
               <b>현재 설계 기준</b>
@@ -444,7 +452,8 @@ function NoMatch({ near, customGrooveMode = false }: { near: ReturnType<typeof s
 }
 
 export function PlanPreview({ candidate, input, pressureMode, modal = false, showBoundaries = true }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; modal?: boolean; showBoundaries?: boolean }) {
-  const extent = input.shape === "round" ? input.outerDiameter : Math.max(input.outerWidth, input.outerHeight);
+  const boundaries = getEnvelopeBoundaries(input);
+  const extent = boundaries.outer.shape === "round" ? boundaries.outer.diameter : Math.max(boundaries.outer.width, boundaries.outer.height);
   const pad = Math.max(42, extent * 0.32);
   const size = extent + 2 * pad;
   const arrowOutward = pressureMode === "internal_pressure";
@@ -460,17 +469,10 @@ export function PlanPreview({ candidate, input, pressureMode, modal = false, sho
           <marker id={markerId} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L6,3 L0,6 Z" /></marker>
         </defs>
         <rect x={-size / 2} y={-size / 2} width={size} height={size} fill={`url(#${modal ? "grid-modal" : "grid-main"})`} opacity="0.35" />
-        {showBoundaries && (input.shape === "round" ? (
-          <>
-            <circle className="boundary-svg outer-svg" data-preview-shape="boundary-round" r={input.outerDiameter / 2} />
-            <circle className="boundary-svg inner-svg" data-preview-shape="boundary-round" r={input.innerDiameter / 2} />
-          </>
-        ) : (
-          <>
-            <rect className="boundary-svg outer-svg" data-preview-shape="boundary-rect" x={-input.outerWidth / 2} y={-input.outerHeight / 2} width={input.outerWidth} height={input.outerHeight} rx={input.outerRadius} />
-            <rect className="boundary-svg inner-svg" data-preview-shape="boundary-rect" x={-input.innerWidth / 2} y={-input.innerHeight / 2} width={input.innerWidth} height={input.innerHeight} rx={input.innerRadius} />
-          </>
-        ))}
+        {showBoundaries && <>
+          <BoundaryPreview boundary={boundaries.outer} className="outer-svg" />
+          <BoundaryPreview boundary={boundaries.inner} className="inner-svg" />
+        </>}
         {candidate.path.shape === "round" ? (
           <circle className="groove-svg" data-preview-shape="groove-round" r={candidate.path.diameter / 2} strokeWidth={candidate.profile.widthMm} />
         ) : (
@@ -489,6 +491,12 @@ export function PlanPreview({ candidate, input, pressureMode, modal = false, sho
       </>}
     </div>
   );
+}
+
+function BoundaryPreview({ boundary, className }: { boundary: ReturnType<typeof getEnvelopeBoundaries>["inner"]; className: string }) {
+  return boundary.shape === "round"
+    ? <circle className={`boundary-svg ${className}`} data-preview-shape="boundary-round" r={boundary.diameter / 2} />
+    : <rect className={`boundary-svg ${className}`} data-preview-shape="boundary-rect" x={-boundary.width / 2} y={-boundary.height / 2} width={boundary.width} height={boundary.height} rx={boundary.radius} />;
 }
 
 function PreviewDimensions({ candidate, extent, pad, compact = false }: { candidate: Candidate; extent: number; pad: number; compact?: boolean }) {

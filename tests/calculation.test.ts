@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildDxf } from "../app/lib/dxf";
-import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForGroovePosition, validateGroovePosition, validateInput, type RectInput, type RoundInput } from "../app/lib/oring";
+import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForGroovePosition, validateGroovePosition, validateInput, type MixedInput, type RectInput, type RoundInput } from "../app/lib/oring";
 import Home, { PlanPreview } from "../app/page";
 
 const round: RoundInput = {
@@ -22,6 +22,22 @@ const rect: RectInput = {
   outerWidth: 140,
   outerHeight: 140,
   outerRadius: 25,
+  innerMargin: 2,
+  outerMargin: 2,
+};
+
+const innerRoundOuterRect: MixedInput = {
+  shape: "mixed",
+  innerBoundary: { shape: "round", diameter: 100 },
+  outerBoundary: { shape: "rect", width: 150, height: 140, radius: 20 },
+  innerMargin: 2,
+  outerMargin: 2,
+};
+
+const innerRectOuterRound: MixedInput = {
+  shape: "mixed",
+  innerBoundary: { shape: "rect", width: 90, height: 90, radius: 8 },
+  outerBoundary: { shape: "round", diameter: 150 },
   innerMargin: 2,
   outerMargin: 2,
 };
@@ -227,6 +243,27 @@ test("허용 영역과 다른 홈 형상도 실제 포함 관계로 찾는다", 
   assert.ok(rectInRound.accepted.every((candidate) => candidate.path.shape === "rect"));
 });
 
+test("안쪽·바깥쪽 허용 경계의 원형과 사각형을 독립적으로 조합한다", () => {
+  const roundInRoundRect = searchCandidates(innerRoundOuterRect, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 });
+  const rectInRectRound = searchCandidates(innerRectOuterRound, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 });
+  assert.ok(roundInRoundRect.accepted.length > 0);
+  assert.ok(rectInRectRound.accepted.length > 0);
+  assert.ok(roundInRoundRect.accepted.every((candidate) => candidate.path.shape === "round"));
+  assert.ok(rectInRectRound.accepted.every((candidate) => candidate.path.shape === "rect"));
+  assert.equal(validateInput(innerRoundOuterRect).length, 0);
+  assert.equal(validateInput(innerRectOuterRound).length, 0);
+  assert.ok(validateInput({ ...innerRectOuterRound, outerBoundary: { shape: "round", diameter: 100 } }).length > 0);
+});
+
+test("혼합 허용 경계와 선택한 홈 형상을 미리보기에 함께 그린다", () => {
+  const candidate = searchCandidates(innerRoundOuterRect, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 }).accepted[0];
+  assert.ok(candidate);
+  const markup = renderToStaticMarkup(createElement(PlanPreview, { candidate, input: innerRoundOuterRect, pressureMode: "internal_vacuum" }));
+  assert.match(markup, /class="boundary-svg outer-svg" data-preview-shape="boundary-rect"/);
+  assert.match(markup, /class="boundary-svg inner-svg" data-preview-shape="boundary-round"/);
+  assert.match(markup, /data-preview-shape="groove-round"/);
+});
+
 test("서로 다른 허용 영역과 홈 형상을 미리보기에 함께 그린다", () => {
   const roundInRect = searchCandidates({ ...rect, outerWidth: 180, outerHeight: 180 }, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 }).accepted[0];
   const rectInRound = searchCandidates({ ...round, outerDiameter: 140 }, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 }).accepted[0];
@@ -244,6 +281,8 @@ test("서로 다른 허용 영역과 홈 형상을 미리보기에 함께 그린
 
 test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 도면에는 상세 주석을 숨긴다", () => {
   const homeMarkup = renderToStaticMarkup(createElement(Home));
+  assert.match(homeMarkup, /aria-label="안쪽 금지 경계 형상 선택"/);
+  assert.match(homeMarkup, /aria-label="바깥쪽 허용 경계 형상 선택"/);
   assert.match(homeMarkup, /aria-label="추천 오링 형번 선택"/);
   assert.match(homeMarkup, /적합 오링 형번/);
   assert.match(homeMarkup, /입력과 동시에 자동 계산됩니다/);
@@ -252,6 +291,9 @@ test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 �
   assert.match(homeMarkup, /사용자 지정\(외경\)/);
   assert.doesNotMatch(homeMarkup, /표준 오링 후보 찾기/);
   assert.doesNotMatch(homeMarkup, /class="candidate-list"/);
+  const grooveShapeStart = homeMarkup.indexOf("오링 홈 형상");
+  const grooveShapeEnd = homeMarkup.indexOf("</select>", grooveShapeStart);
+  assert.doesNotMatch(homeMarkup.slice(grooveShapeStart, grooveShapeEnd), /자동/);
   const selectStart = homeMarkup.indexOf('aria-label="추천 오링 형번 선택"');
   const selectEnd = homeMarkup.indexOf("</select>", selectStart);
   const displayedDashNumbers = [...homeMarkup.slice(selectStart, selectEnd).matchAll(/AS568-(\d+) ·/g)].map((match) => Number(match[1]));

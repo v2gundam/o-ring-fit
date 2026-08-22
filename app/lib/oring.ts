@@ -42,7 +42,19 @@ export type RectInput = {
   outerMargin: number;
 };
 
-export type ShapeInput = RoundInput | RectInput;
+export type BoundaryInput =
+  | { shape: "round"; diameter: number }
+  | { shape: "rect"; width: number; height: number; radius: number };
+
+export type MixedInput = {
+  shape: "mixed";
+  innerBoundary: BoundaryInput;
+  outerBoundary: BoundaryInput;
+  innerMargin: number;
+  outerMargin: number;
+};
+
+export type ShapeInput = RoundInput | RectInput | MixedInput;
 
 export type GlandProfile = {
   section: GlandSection;
@@ -231,15 +243,37 @@ export function validateInput(input: ShapeInput): string[] {
   if (input.shape === "round") {
     if (!positive(input.innerDiameter) || !positive(input.outerDiameter)) errors.push("내경과 외경은 0보다 커야 합니다.");
     if (input.outerDiameter <= input.innerDiameter) errors.push("플랜지 외경은 챔버 내경보다 커야 합니다.");
-  } else {
+  } else if (input.shape === "rect") {
     if (![input.innerWidth, input.innerHeight, input.outerWidth, input.outerHeight].every(positive)) errors.push("가로와 세로는 0보다 커야 합니다.");
     if (![input.innerRadius, input.outerRadius].every(nonNegative)) errors.push("모서리 반경은 0 이상이어야 합니다.");
     if (input.innerRadius * 2 > Math.min(input.innerWidth, input.innerHeight)) errors.push("안쪽 모서리 반경이 형상보다 큽니다.");
     if (input.outerRadius * 2 > Math.min(input.outerWidth, input.outerHeight)) errors.push("바깥쪽 모서리 반경이 형상보다 큽니다.");
     if (input.outerWidth <= input.innerWidth || input.outerHeight <= input.innerHeight) errors.push("바깥쪽 허용 경계가 안쪽 금지 경계를 포함해야 합니다.");
+  } else {
+    errors.push(...validateBoundary(input.innerBoundary, "안쪽 금지 경계"));
+    errors.push(...validateBoundary(input.outerBoundary, "바깥쪽 허용 경계"));
+    if (errors.length === 0 && !shapeContains(toBoundaryGeometry(input.outerBoundary), toBoundaryGeometry(input.innerBoundary))) {
+      errors.push("바깥쪽 허용 경계가 안쪽 금지 경계를 완전히 포함해야 합니다.");
+    }
   }
   if (!nonNegative(input.innerMargin) || !nonNegative(input.outerMargin)) errors.push("벽 여유는 0 이상이어야 합니다.");
   return errors;
+}
+
+export function getEnvelopeBoundaries(input: ShapeInput): { inner: BoundaryInput; outer: BoundaryInput } {
+  if (input.shape === "round") {
+    return {
+      inner: { shape: "round", diameter: input.innerDiameter },
+      outer: { shape: "round", diameter: input.outerDiameter },
+    };
+  }
+  if (input.shape === "rect") {
+    return {
+      inner: { shape: "rect", width: input.innerWidth, height: input.innerHeight, radius: input.innerRadius },
+      outer: { shape: "rect", width: input.outerWidth, height: input.outerHeight, radius: input.outerRadius },
+    };
+  }
+  return { inner: input.innerBoundary, outer: input.outerBoundary };
 }
 
 export function validateGroovePosition(input: GroovePositionInput): string[] {
@@ -390,7 +424,7 @@ export function verifyLengthFit(input: {
 }
 
 function solvePath(input: ShapeInput, grooveWidth: number, csMm: number, freeLength: number, supportWall: Candidate["supportWall"], pressureAnchored: boolean, options: SearchOptions) {
-  const grooveShape = options.grooveShape ?? input.shape;
+  const grooveShape = options.grooveShape ?? (input.shape === "mixed" ? input.innerBoundary.shape : input.shape);
   const supportOffset = pressureAnchored ? Math.PI * (grooveWidth - csMm) : 0;
   const targetGrooveLength = supportWall === "GROOVE OD" ? freeLength - supportOffset : freeLength + supportOffset;
   const geometry = grooveShape === "round"
@@ -475,11 +509,11 @@ function solveRectGroove(input: ShapeInput, grooveWidth: number, csMm: number, t
   if (!Number.isFinite(radius) || radius <= 0) return invalid(0, "둥근 사각형 글랜드의 중심선 R은 0보다 커야 합니다.");
   if (innerCornerRadius < 3 * csMm) return invalid(0, `홈 안쪽 R ${(innerCornerRadius).toFixed(2)} mm가 최소 3×CS인 ${(3 * csMm).toFixed(2)} mm보다 작습니다.`);
 
-  const rawStart = input.shape === "round"
+  const rawStart = innerSafe.shape === "round"
     ? { width: innerSafe.radius * 2 + grooveWidth, height: innerSafe.radius * 2 + grooveWidth }
     : { width: innerSafe.width + grooveWidth, height: innerSafe.height + grooveWidth };
   const start = { width: Math.max(rawStart.width, 2 * radius), height: Math.max(rawStart.height, 2 * radius) };
-  const end = input.shape === "round"
+  const end = outerSafe.shape === "round"
     ? { width: outerSafe.radius * 2 - grooveWidth, height: outerSafe.radius * 2 - grooveWidth }
     : { width: outerSafe.width - grooveWidth, height: outerSafe.height - grooveWidth };
 
@@ -517,29 +551,53 @@ type BoundaryGeometry =
   | { shape: "round"; radius: number }
   | { shape: "rect"; width: number; height: number; radius: number };
 
+function validateBoundary(input: BoundaryInput, label: string): string[] {
+  if (input.shape === "round") {
+    return Number.isFinite(input.diameter) && input.diameter > 0 ? [] : [`${label}의 직경은 0보다 커야 합니다.`];
+  }
+  const errors: string[] = [];
+  if (![input.width, input.height].every((value) => Number.isFinite(value) && value > 0)) errors.push(`${label}의 가로와 세로는 0보다 커야 합니다.`);
+  if (!Number.isFinite(input.radius) || input.radius < 0) errors.push(`${label}의 모서리 R은 0 이상이어야 합니다.`);
+  if (Number.isFinite(input.radius) && Number.isFinite(input.width) && Number.isFinite(input.height) && input.radius * 2 > Math.min(input.width, input.height)) {
+    errors.push(`${label}의 모서리 R이 형상보다 큽니다.`);
+  }
+  return errors;
+}
+
+function toBoundaryGeometry(input: BoundaryInput): BoundaryGeometry {
+  return input.shape === "round"
+    ? { shape: "round", radius: input.diameter / 2 }
+    : { shape: "rect", width: input.width, height: input.height, radius: input.radius };
+}
+
+function rawInnerBoundary(input: ShapeInput): BoundaryGeometry {
+  return toBoundaryGeometry(getEnvelopeBoundaries(input).inner);
+}
+
+function rawOuterBoundary(input: ShapeInput): BoundaryGeometry {
+  return toBoundaryGeometry(getEnvelopeBoundaries(input).outer);
+}
+
 function expandedInnerBoundary(input: ShapeInput): BoundaryGeometry {
-  if (input.shape === "round") return { shape: "round", radius: input.innerDiameter / 2 + input.innerMargin };
-  return {
-    shape: "rect",
-    width: input.innerWidth + 2 * input.innerMargin,
-    height: input.innerHeight + 2 * input.innerMargin,
-    radius: input.innerRadius + input.innerMargin,
-  };
+  const boundary = rawInnerBoundary(input);
+  if (boundary.shape === "round") return { shape: "round", radius: boundary.radius + input.innerMargin };
+  return { shape: "rect", width: boundary.width + 2 * input.innerMargin, height: boundary.height + 2 * input.innerMargin, radius: boundary.radius + input.innerMargin };
 }
 
 function insetOuterBoundary(input: ShapeInput): BoundaryGeometry | null {
-  if (input.shape === "round") {
-    const radius = input.outerDiameter / 2 - input.outerMargin;
+  const boundary = rawOuterBoundary(input);
+  if (boundary.shape === "round") {
+    const radius = boundary.radius - input.outerMargin;
     return radius > 0 ? { shape: "round", radius } : null;
   }
-  const width = input.outerWidth - 2 * input.outerMargin;
-  const height = input.outerHeight - 2 * input.outerMargin;
+  const width = boundary.width - 2 * input.outerMargin;
+  const height = boundary.height - 2 * input.outerMargin;
   if (width <= 0 || height <= 0) return null;
   return {
     shape: "rect",
     width,
     height,
-    radius: clamp(input.outerRadius - input.outerMargin, 0, Math.min(width, height) / 2),
+    radius: clamp(boundary.radius - input.outerMargin, 0, Math.min(width, height) / 2),
   };
 }
 
@@ -638,8 +696,10 @@ function findLastTrue(predicate: (value: number) => boolean) {
 
 function automaticGrooveRadius(input: ShapeInput, grooveWidth: number, csMm: number) {
   const minimum = 3 * csMm + grooveWidth / 2;
-  if (input.shape === "round") return Math.max(minimum, input.innerDiameter * 0.18);
-  return Math.max(minimum, (input.innerRadius + input.outerRadius) / 2);
+  const inner = rawInnerBoundary(input);
+  const outer = rawOuterBoundary(input);
+  if (inner.shape === "round") return Math.max(minimum, inner.radius * 0.36);
+  return Math.max(minimum, outer.shape === "rect" ? (inner.radius + outer.radius) / 2 : inner.radius);
 }
 
 function getGlandProfile(size: As568Size, medium: Medium, section: GlandSection): GlandProfile | null {

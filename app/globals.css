@@ -26,6 +26,7 @@ button { color:inherit; }
 .segmented button { border:1px solid var(--line); background:#f5f3ed; padding:12px 10px; color:var(--muted); font-size:11px; font-weight:700; cursor:pointer; }
 .segmented button+button { border-left:0; }.segmented button.active { background:var(--ink); color:#fff; border-color:var(--ink); }
 .input-groups { display:grid; grid-template-columns:1fr 1fr; gap:10px; }.input-groups.single { grid-template-columns:1fr; }
+.boundary-groups { margin-top:18px; }
 fieldset { min-width:0; margin:0; padding:12px; border:1px solid var(--line); background:#fbfaf5; }
 legend { padding:0 5px; color:var(--muted); font-size:10px; font-weight:700; }
 legend i { display:inline-block; width:7px; height:7px; margin-right:5px; border-radius:2px; }.inner-dot { background:var(--orange); }.outer-dot { border:2px solid var(--blue); }
