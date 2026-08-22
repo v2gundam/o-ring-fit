@@ -1,0 +1,80 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { buildDxf } from "../app/lib/dxf";
+import { searchCandidates, validateInput, type RectInput, type RoundInput } from "../app/lib/oring";
+
+const round: RoundInput = {
+  shape: "round",
+  innerDiameter: 100,
+  outerDiameter: 120,
+  innerMargin: 1,
+  outerMargin: 1,
+};
+
+const rect: RectInput = {
+  shape: "rect",
+  innerWidth: 100,
+  innerHeight: 100,
+  innerRadius: 5,
+  outerWidth: 140,
+  outerHeight: 140,
+  outerRadius: 25,
+  innerMargin: 2,
+  outerMargin: 2,
+};
+
+test("원형 기본 예제는 허용 영역 안의 표준 후보를 찾는다", () => {
+  const result = searchCandidates(round, "vacuum", "internal_vacuum");
+  assert.ok(result.accepted.length > 1);
+  for (const candidate of result.accepted) {
+    assert.equal(candidate.path.shape, "round");
+    if (candidate.path.shape !== "round") continue;
+    const innerEdge = candidate.path.diameter - candidate.profile.widthMm;
+    const outerEdge = candidate.path.diameter + candidate.profile.widthMm;
+    assert.ok(innerEdge >= round.innerDiameter + 2 * round.innerMargin - 1e-8);
+    assert.ok(outerEdge <= round.outerDiameter - 2 * round.outerMargin + 1e-8);
+    assert.ok(candidate.worstStretch <= 0.05 + 1e-9);
+    assert.ok(candidate.worstCompression >= -0.03 - 1e-9);
+    assert.equal(candidate.supportWall, "GROOVE ID");
+  }
+});
+
+test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한다", () => {
+  const result = searchCandidates(rect, "gas", "internal_pressure");
+  assert.ok(result.accepted.length > 1);
+  for (const candidate of result.accepted) {
+    assert.equal(candidate.path.shape, "rect");
+    if (candidate.path.shape !== "rect") continue;
+    const halfWidth = candidate.profile.widthMm / 2;
+    assert.ok(candidate.path.width - candidate.profile.widthMm >= rect.innerWidth + 2 * rect.innerMargin - 1e-8);
+    assert.ok(candidate.path.height - candidate.profile.widthMm >= rect.innerHeight + 2 * rect.innerMargin - 1e-8);
+    assert.ok(candidate.path.width + candidate.profile.widthMm <= rect.outerWidth - 2 * rect.outerMargin + 1e-8);
+    assert.ok(candidate.path.height + candidate.profile.widthMm <= rect.outerHeight - 2 * rect.outerMargin + 1e-8);
+    assert.ok(candidate.path.radius - halfWidth >= 3 * candidate.csMm - 1e-8);
+    assert.equal(candidate.supportWall, "GROOVE OD");
+  }
+});
+
+test("공간이 부족하면 후보 없음과 근접 후보 이유를 반환한다", () => {
+  const input: RoundInput = { ...round, outerDiameter: 102 };
+  const result = searchCandidates(input, "vacuum", "internal_vacuum");
+  assert.equal(result.accepted.length, 0);
+  assert.ok(result.near.length > 0);
+  assert.match(result.near[0].reason, /공간|신장|압축/);
+});
+
+test("형상 입력 오류를 사전에 검출한다", () => {
+  assert.ok(validateInput({ ...round, outerDiameter: 90 }).length > 0);
+  assert.ok(validateInput({ ...rect, innerRadius: 60 }).length > 0);
+});
+
+test("DXF는 R14·mm 헤더와 닫힌 둥근 사각형 가공 루프를 포함한다", () => {
+  const candidate = searchCandidates(rect, "vacuum", "internal_vacuum").accepted[0];
+  assert.ok(candidate);
+  const dxf = buildDxf(candidate, rect, "internal_vacuum", "vacuum");
+  assert.match(dxf, /\$ACADVER\n1\nAC1014/);
+  assert.match(dxf, /\$INSUNITS\n70\n4/);
+  assert.match(dxf, /0\nLWPOLYLINE[\s\S]*?70\n1/);
+  assert.match(dxf, /8\nGROOVE_CUT/);
+  assert.match(dxf, /0\nEOF/);
+});
