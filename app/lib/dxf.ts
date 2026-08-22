@@ -28,7 +28,7 @@ export function buildDxf(candidate: Candidate, input: ExportInput, pressureMode:
   addText(entities, "DIMENSIONS", noteX, topY - 12, 3.0, planDimensionNote(candidate));
   addText(entities, "DIMENSIONS", noteX, topY - 18, 3.0, sectionDimensionNote(candidate));
   addText(entities, "NOTES", noteX, topY - 24, 3.0, `LENGTH CHECK: FREE ${fmt(candidate.freeLengthMm)} / APPLIED ${fmt(candidate.pathLengthMm)} / DELTA ${fmtSigned(candidate.lengthCheck.differenceMm)} mm`);
-  addText(entities, "NOTES", noteX, topY - 30, 3.0, `INSTALL: ${candidate.label.toUpperCase()} / SQUEEZE ${candidate.profile.squeezePercent.toFixed(1)}%`);
+  addText(entities, "NOTES", noteX, topY - 30, 3.0, `INSTALL: ${candidate.label.toUpperCase()} / SQUEEZE ${candidate.profile.squeezePercent.toFixed(1)}% / MEDIUM ${medium.toUpperCase()}`);
   addText(entities, "PRESSURE", noteX, topY - 36, 3.0, `O-RING MOVEMENT: ${pressureMode.toUpperCase()} / SUPPORT: ${candidate.supportWall}`);
   addText(entities, "NOTES", noteX, topY - 42, 2.5, `REFERENCE: PARKER ORD 5700 ${candidate.profile.section === "rect" ? "FACE SEAL" : "DOVETAIL"} PROFILE / VERIFY BEFORE MACHINING`);
 

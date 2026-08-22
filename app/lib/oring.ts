@@ -16,6 +16,11 @@ export type SearchOptions = {
   glandSection?: GlandSection;
 };
 
+export type CustomRoundGrooveInput = {
+  innerDiameter: number;
+  outerDiameter: number;
+};
+
 export type RoundInput = {
   shape: "round";
   innerDiameter: number;
@@ -173,6 +178,60 @@ export function searchCandidates(input: ShapeInput, medium: Medium, pressureMode
   return { accepted, near: near.slice(0, 5) };
 }
 
+export function searchCandidatesForRoundGroove(input: CustomRoundGrooveInput, medium: Medium, pressureMode: PressureMode, options: Omit<SearchOptions, "grooveShape" | "grooveRadius"> = {}) {
+  const accepted: Candidate[] = [];
+  const near: NearCandidate[] = [];
+  const widthNear: NearCandidate[] = [];
+  const grooveWidth = (input.outerDiameter - input.innerDiameter) / 2;
+  const fixedInput: RoundInput = {
+    shape: "round",
+    innerDiameter: input.innerDiameter,
+    outerDiameter: input.outerDiameter,
+    innerMargin: 0,
+    outerMargin: 0,
+  };
+
+  if (validateCustomRoundGroove(input).length) return { accepted, near };
+
+  for (const size of AS568_SIZES) {
+    if (Number(size.dash) >= 900) continue;
+    if (options.csMm && Math.abs(size.csIn * INCH_TO_MM - options.csMm) > 0.03) continue;
+    const recommendedProfile = getGlandProfile(size, medium, options.glandSection ?? "rect");
+    if (!recommendedProfile) continue;
+    if (grooveWidth < recommendedProfile.widthMinMm - 1e-9 || grooveWidth > recommendedProfile.widthMaxMm + 1e-9) {
+      const widthGap = grooveWidth < recommendedProfile.widthMinMm
+        ? recommendedProfile.widthMinMm - grooveWidth
+        : grooveWidth - recommendedProfile.widthMaxMm;
+      widthNear.push({
+        dash: size.dash,
+        idMm: size.idIn * INCH_TO_MM,
+        csMm: size.csIn * INCH_TO_MM,
+        requiredStrain: widthGap / grooveWidth,
+        reason: `입력 홈 폭 ${grooveWidth.toFixed(2)} mm가 이 단면의 권장 범위 ${recommendedProfile.widthMinMm.toFixed(2)}–${recommendedProfile.widthMaxMm.toFixed(2)} mm를 벗어납니다.`,
+      });
+      continue;
+    }
+
+    const profile: GlandProfile = {
+      ...recommendedProfile,
+      widthMm: grooveWidth,
+      mouthWidthMm: recommendedProfile.section === "rect" ? grooveWidth : recommendedProfile.mouthWidthMm,
+      bottomWidthMm: grooveWidth,
+    };
+    const evaluated = evaluateSize(size, profile, fixedInput, pressureMode, {
+      ...options,
+      grooveShape: "round",
+    });
+    if ("candidate" in evaluated) accepted.push(evaluated.candidate);
+    else near.push(evaluated.near);
+  }
+
+  accepted.sort((a, b) => a.score - b.score || Number(a.dash) - Number(b.dash));
+  near.sort((a, b) => Math.abs(a.requiredStrain) - Math.abs(b.requiredStrain) || Number(a.dash) - Number(b.dash));
+  widthNear.sort((a, b) => Math.abs(a.requiredStrain) - Math.abs(b.requiredStrain) || Number(a.dash) - Number(b.dash));
+  return { accepted, near: (near.length ? near : widthNear).slice(0, 5) };
+}
+
 export function validateInput(input: ShapeInput): string[] {
   const errors: string[] = [];
   const positive = (value: number) => Number.isFinite(value) && value > 0;
@@ -189,6 +248,15 @@ export function validateInput(input: ShapeInput): string[] {
     if (input.outerWidth <= input.innerWidth || input.outerHeight <= input.innerHeight) errors.push("바깥쪽 허용 경계가 안쪽 금지 경계를 포함해야 합니다.");
   }
   if (!nonNegative(input.innerMargin) || !nonNegative(input.outerMargin)) errors.push("벽 여유는 0 이상이어야 합니다.");
+  return errors;
+}
+
+export function validateCustomRoundGroove(input: CustomRoundGrooveInput): string[] {
+  const errors: string[] = [];
+  if (!Number.isFinite(input.innerDiameter) || input.innerDiameter <= 0 || !Number.isFinite(input.outerDiameter) || input.outerDiameter <= 0) {
+    errors.push("사용자 지정 홈 내경과 외경은 0보다 커야 합니다.");
+  }
+  if (input.outerDiameter <= input.innerDiameter) errors.push("사용자 지정 홈 외경은 내경보다 커야 합니다.");
   return errors;
 }
 
