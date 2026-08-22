@@ -25,10 +25,11 @@ export function buildDxf(candidate: Candidate, input: ExportInput, pressureMode:
   const topY = bounds / 2;
   addText(entities, "NOTES", noteX, topY, 3.5, `O-RING: AS568-${candidate.dash} / ID ${fmt(candidate.idMm)} x CS ${fmt(candidate.csMm)} mm`);
   addText(entities, "NOTES", noteX, topY - 6, 3.0, "MATERIAL: FKM (VITON) / HARDNESS: TBD");
-  addText(entities, "NOTES", noteX, topY - 12, 3.0, `GLAND: WIDTH ${fmt(width)} / DEPTH ${fmt(candidate.profile.depthMm)} mm`);
-  addText(entities, "NOTES", noteX, topY - 18, 3.0, `INSTALL: ${candidate.label.toUpperCase()} / SQUEEZE ${candidate.profile.squeezePercent.toFixed(1)}%`);
-  addText(entities, "PRESSURE", noteX, topY - 24, 3.0, `MEDIUM: ${medium.toUpperCase()} / SUPPORT: ${candidate.supportWall}`);
-  addText(entities, "NOTES", noteX, topY - 30, 2.5, "REFERENCE: PARKER ORD 5700 FACE SEAL PROFILE / VERIFY BEFORE MACHINING");
+  addText(entities, "DIMENSIONS", noteX, topY - 12, 3.0, planDimensionNote(candidate));
+  addText(entities, "DIMENSIONS", noteX, topY - 18, 3.0, `GLAND SECTION: WIDTH ${fmt(width)} / DEPTH ${fmt(candidate.profile.depthMm)} mm`);
+  addText(entities, "NOTES", noteX, topY - 24, 3.0, `INSTALL: ${candidate.label.toUpperCase()} / SQUEEZE ${candidate.profile.squeezePercent.toFixed(1)}%`);
+  addText(entities, "PRESSURE", noteX, topY - 30, 3.0, `O-RING MOVEMENT: ${pressureMode.toUpperCase()} / SUPPORT: ${candidate.supportWall}`);
+  addText(entities, "NOTES", noteX, topY - 36, 2.5, "REFERENCE: PARKER ORD 5700 FACE SEAL PROFILE / VERIFY BEFORE MACHINING");
 
   const sectionX = noteX;
   const sectionY = -bounds / 2 + 18;
@@ -97,3 +98,11 @@ function addText(out: string[], layer: string, x: number, y: number, height: num
 
 function fmt(value: number) { return value.toFixed(2); }
 function fmtRaw(value: number) { return Number(value.toFixed(6)).toString(); }
+
+function planDimensionNote(candidate: Candidate) {
+  const width = candidate.profile.widthMm;
+  if (candidate.path.shape === "round") {
+    return `GLAND PLAN: ID ${fmt(candidate.path.diameter - width)} / CENTER DIA ${fmt(candidate.path.diameter)} / OD ${fmt(candidate.path.diameter + width)} mm`;
+  }
+  return `GLAND CENTER PATH: W ${fmt(candidate.path.width)} / H ${fmt(candidate.path.height)} / R ${fmt(candidate.path.radius)} mm`;
+}

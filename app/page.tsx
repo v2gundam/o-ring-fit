@@ -211,6 +211,7 @@ export default function Home() {
           {selected ? (
             <>
               <PlanPreview candidate={selected} input={searchedInput} pressureMode={searchedMode} />
+              <GlandDimensions candidate={selected} compact />
               <div className="drawing-data">
                 <div><small>선택 오링</small><b>AS568-{selected.dash}</b></div>
                 <div><small>글랜드 W × D</small><b>{selected.profile.widthMm.toFixed(2)} × {selected.profile.depthMm.toFixed(2)} mm</b></div>
@@ -280,13 +281,20 @@ function NoMatch({ near }: { near: ReturnType<typeof searchCandidates>["near"] }
 
 function PlanPreview({ candidate, input, pressureMode, modal = false }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; modal?: boolean }) {
   const extent = input.shape === "round" ? input.outerDiameter : Math.max(input.outerWidth, input.outerHeight);
-  const pad = Math.max(10, extent * 0.13);
+  const pad = Math.max(16, extent * 0.2);
   const size = extent + 2 * pad;
-  const arrowRight = pressureMode === "internal_pressure";
+  const arrowOutward = pressureMode === "internal_pressure";
+  const pressureY = extent * 0.43;
+  const pressureStart = arrowOutward ? extent * 0.12 : extent * 0.48;
+  const pressureEnd = arrowOutward ? extent * 0.45 : extent * 0.15;
+  const markerId = modal ? "pressure-arrow-modal" : "pressure-arrow-main";
   return (
     <div className={`drawing functional ${modal ? "modal-drawing" : ""}`}>
       <svg viewBox={`${-size / 2} ${-size / 2} ${size} ${size}`} role="img" aria-label="오링 홈 평면 미리보기">
-        <defs><pattern id={modal ? "grid-modal" : "grid-main"} width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#8aa099" strokeWidth="0.35" /></pattern></defs>
+        <defs>
+          <pattern id={modal ? "grid-modal" : "grid-main"} width="10" height="10" patternUnits="userSpaceOnUse"><path d="M 10 0 L 0 0 0 10" fill="none" stroke="#8aa099" strokeWidth="0.35" /></pattern>
+          <marker id={markerId} markerWidth="6" markerHeight="6" refX="5" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L6,3 L0,6 Z" /></marker>
+        </defs>
         <rect x={-size / 2} y={-size / 2} width={size} height={size} fill={`url(#${modal ? "grid-modal" : "grid-main"})`} opacity="0.35" />
         {input.shape === "round" ? (
           <>
@@ -302,11 +310,71 @@ function PlanPreview({ candidate, input, pressureMode, modal = false }: { candid
           </>
         )}
         <line className="center-axis" x1={-extent * 0.55} x2={extent * 0.55} y1="0" y2="0" />
-        <line className="pressure-line" x1={arrowRight ? -extent * 0.22 : extent * 0.22} x2={arrowRight ? extent * 0.22 : -extent * 0.22} y1={extent * 0.43} y2={extent * 0.43} />
-        <path className="pressure-tip" d={arrowRight ? `M ${extent * 0.22} ${extent * 0.43} l -5 -3 m 5 3 l -5 3` : `M ${-extent * 0.22} ${extent * 0.43} l 5 -3 m -5 3 l 5 3`} />
+        <PreviewDimensions candidate={candidate} extent={extent} pad={pad} />
+        <line className="pressure-line" x1={pressureStart} x2={pressureEnd} y1={pressureY} y2={pressureY} markerEnd={`url(#${markerId})`} />
+        <text className="pressure-svg-label" x={(pressureStart + pressureEnd) / 2} y={pressureY - 3} textAnchor="middle">오링 이동</text>
       </svg>
-      <div className="pressure-caption">{pressureModeLabel(pressureMode)} · {supportWallKo(candidate.supportWall)} 지지</div>
+      <div className="pressure-caption"><b>{pressureModeLabel(pressureMode)}</b><span>화살표: 압력에 의한 오링 이동</span><em>도착점: {supportWallKo(candidate.supportWall)}</em></div>
       <div className="drawing-legend"><span className="legend-inner">금지 경계</span><span className="legend-groove">가공 홈</span><span className="legend-outer">허용 경계</span></div>
+    </div>
+  );
+}
+
+function PreviewDimensions({ candidate, extent, pad }: { candidate: Candidate; extent: number; pad: number }) {
+  const dimOffset = Math.max(5, pad * 0.38);
+  if (candidate.path.shape === "round") {
+    const radius = candidate.path.diameter / 2;
+    const y = -extent / 2 - dimOffset;
+    return (
+      <g className="preview-dimensions">
+        <line x1={-radius} x2={radius} y1={y} y2={y} />
+        <line x1={-radius} x2={-radius} y1={-8} y2={y + 3} />
+        <line x1={radius} x2={radius} y1={-8} y2={y + 3} />
+        <path d={`M ${-radius} ${y} l 4 -2 v 4 Z M ${radius} ${y} l -4 -2 v 4 Z`} />
+        <text x="0" y={y - 3} textAnchor="middle">홈 중심 Ø {candidate.path.diameter.toFixed(2)} mm</text>
+      </g>
+    );
+  }
+
+  const { width, height, radius } = candidate.path;
+  const topY = -extent / 2 - dimOffset;
+  const rightX = extent / 2 + dimOffset;
+  return (
+    <g className="preview-dimensions">
+      <line x1={-width / 2} x2={width / 2} y1={topY} y2={topY} />
+      <line x1={-width / 2} x2={-width / 2} y1={-height / 2} y2={topY + 3} />
+      <line x1={width / 2} x2={width / 2} y1={-height / 2} y2={topY + 3} />
+      <path d={`M ${-width / 2} ${topY} l 4 -2 v 4 Z M ${width / 2} ${topY} l -4 -2 v 4 Z`} />
+      <text x="0" y={topY - 3} textAnchor="middle">홈 중심 W {width.toFixed(2)} mm</text>
+      <line x1={rightX} x2={rightX} y1={-height / 2} y2={height / 2} />
+      <line x1={width / 2} x2={rightX - 3} y1={-height / 2} y2={-height / 2} />
+      <line x1={width / 2} x2={rightX - 3} y1={height / 2} y2={height / 2} />
+      <path d={`M ${rightX} ${-height / 2} l -2 4 h 4 Z M ${rightX} ${height / 2} l -2 -4 h 4 Z`} />
+      <text x={rightX + 4} y="0" textAnchor="middle" transform={`rotate(90 ${rightX + 4} 0)`}>홈 중심 H {height.toFixed(2)} mm</text>
+      <path className="radius-leader" d={`M ${width / 2 - radius * 0.7} ${-height / 2 + radius * 0.3} l ${Math.max(8, radius * 0.8)} ${-Math.max(7, radius * 0.5)}`} />
+      <text className="radius-text" x={width / 2 - radius * 0.05} y={-height / 2 + radius * 0.3 - Math.max(8, radius * 0.5)}>R {radius.toFixed(2)}</text>
+    </g>
+  );
+}
+
+function GlandDimensions({ candidate, compact = false }: { candidate: Candidate; compact?: boolean }) {
+  const grooveWidth = candidate.profile.widthMm;
+  const profile = candidate.path.shape === "round"
+    ? [
+        ["홈 내경", `Ø ${(candidate.path.diameter - grooveWidth).toFixed(2)} mm`],
+        ["홈 중심", `Ø ${candidate.path.diameter.toFixed(2)} mm`],
+        ["홈 외경", `Ø ${(candidate.path.diameter + grooveWidth).toFixed(2)} mm`],
+      ]
+    : [
+        ["홈 안쪽 형상", `${(candidate.path.width - grooveWidth).toFixed(2)} × ${(candidate.path.height - grooveWidth).toFixed(2)} · R ${(candidate.path.radius - grooveWidth / 2).toFixed(2)} mm`],
+        ["홈 중심 경로", `${candidate.path.width.toFixed(2)} × ${candidate.path.height.toFixed(2)} · R ${candidate.path.radius.toFixed(2)} mm`],
+        ["홈 바깥 형상", `${(candidate.path.width + grooveWidth).toFixed(2)} × ${(candidate.path.height + grooveWidth).toFixed(2)} · R ${(candidate.path.radius + grooveWidth / 2).toFixed(2)} mm`],
+      ];
+  return (
+    <div className={`gland-dimension-card ${compact ? "compact" : ""}`}>
+      <div className="dimension-card-title"><b>글랜드 가공 치수</b><span>단위 mm</span></div>
+      <div className="plan-dimension-grid">{profile.map(([label, value]) => <span key={label}><small>{label}</small><b>{value}</b></span>)}</div>
+      <div className="section-dimension-line"><span>홈 폭 <b>{grooveWidth.toFixed(2)}</b></span><span>홈 깊이 <b>{candidate.profile.depthMm.toFixed(2)}</b></span><span>바닥 R <b>{candidate.profile.radiusMinMm.toFixed(2)}–{candidate.profile.radiusMaxMm.toFixed(2)}</b></span></div>
     </div>
   );
 }
@@ -329,6 +397,7 @@ function DxfDialog({ candidate, input, pressureMode, medium, onClose, onDownload
               <div><dt>MEDIA</dt><dd>{mediumLabel(medium)} · {pressureModeLabel(pressureMode)}</dd></div>
               <div><dt>MATERIAL</dt><dd>FKM (Viton™), hardness/compound TBD</dd></div>
             </dl>
+            <GlandDimensions candidate={candidate} />
             <CrossSection candidate={candidate} />
             <p>가공 전 온도·압력·공차·표면조도와 재질 등급을 제조사 자료로 최종 검토하십시오.</p>
           </div>
