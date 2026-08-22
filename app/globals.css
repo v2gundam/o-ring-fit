@@ -98,6 +98,73 @@ footer { display:flex; align-items:center; justify-content:space-between; gap:20
 .drawing-notes { padding:28px 24px; }.drawing-notes>b { font:600 15px Georgia,serif; }.drawing-notes dl { margin:18px 0 10px; }.drawing-notes dl div { display:grid; grid-template-columns:70px 1fr; gap:8px; padding:8px 0; border-top:1px solid var(--line); }.drawing-notes dt { color:var(--muted); font-size:8px; font-weight:800; }.drawing-notes dd { margin:0; font-size:9px; line-height:1.4; }.drawing-notes>p { margin:13px 0 0; color:#866a56; font-size:8px; line-height:1.5; }
 .section-sketch { padding:10px; border:1px solid var(--line); background:#fff; }.section-sketch svg { display:block; width:100%; }.section-sketch path,.section-sketch line { fill:none; stroke:var(--ink); stroke-width:2; }.section-sketch ellipse { fill:rgba(233,92,61,.13); stroke:var(--orange); stroke-width:2; }.section-sketch text { fill:var(--muted); font:7px Arial,sans-serif; }
 .dxf-dialog>footer { display:flex; padding:12px 18px; border-top:1px solid var(--line); background:#ece9df; }.dxf-dialog>footer span { font-size:7px; }.dxf-dialog>footer button { margin-left:auto; padding:11px 16px; border:0; background:var(--orange); color:#fff; cursor:pointer; font-size:10px; font-weight:800; }
+
+/* Readability scale: engineering values and annotations must remain legible at normal browser zoom. */
+.inputs,.results,.preview { padding:30px; }
+.section-head>span { width:36px; height:36px; font-size:12px; }
+.section-head b { font-size:18px; }
+.section-head small { font-size:13px; line-height:1.4; }
+.field-label { font-size:12px; }
+.segmented button { min-height:48px; font-size:14px; }
+fieldset { padding:14px; }
+legend { font-size:13px; }
+.dimension { min-height:48px; font-size:13px; }
+.dimension input { width:72px; font-size:16px; }
+.dimension em { width:26px; font-size:11px; }
+.design-options label,.condition-row label { font-size:12px; }
+.design-options select,.condition-row select,.number-control { min-height:44px; font-size:14px; }
+.number-control input { font-size:16px; }
+.number-control em { font-size:11px; }
+.pressure-design-note,.radius-guide,.auto-shape-note,.retention-note { font-size:11px; line-height:1.5; }
+.pressure-design-note em,.retention-note em,.auto-shape-note em { font-size:10px; }
+.radius-guide-head b,.radius-guide.auto b { font-size:12px; }
+.radius-guide-head span,.radius-guide-values small,.radius-guide-values em,.radius-guide p { font-size:10px; }
+.radius-guide-values b { font-size:12px; }
+.fixed-material { font-size:12px; }
+.fixed-material b { font-size:15px; }
+.fixed-material em { font-size:10px; }
+.error-box { font-size:12px; }
+.search-button,.dxf-button { min-height:52px; font-size:15px; }
+.candidate { padding:17px 13px; }
+.candidate-name b { font-size:19px; }
+.candidate-name small { font-size:12px; line-height:1.4; }
+.fit-badge { padding:6px 9px; font-size:11px; }
+.result-note { font-size:12px; }
+.result-note span { width:20px; height:20px; }
+.drawing-status { font-size:11px; }
+.drawing-data small { font-size:10px; }
+.drawing-data b { font-size:13px; line-height:1.45; }
+.selection-details { font-size:10px; line-height:1.5; }
+.selection-details b { font-size:12px; }
+.preview-warning { font-size:10px; line-height:1.55; }
+.pressure-svg-label { font-size:5px; }
+.preview-dimensions text { font-size:5px; stroke-width:1.4px; }
+.preview-dimensions .radius-summary { font-size:4.8px; }
+.pressure-caption { padding:8px 11px; font-size:10px; }
+.pressure-caption b { font-size:11px; }
+.drawing-legend { font-size:9.5px; }
+.dimension-card-title { padding:11px 12px; font-size:12px; }
+.dimension-card-title span { font-size:10px; }
+.plan-dimension-grid>span { padding:11px 10px; }
+.plan-dimension-grid small { font-size:10px; }
+.plan-dimension-grid b { font-size:12px; line-height:1.45; }
+.section-dimension-line { padding:10px 12px; font-size:10px; line-height:1.5; }
+.section-dimension-line b { font-size:12px; }
+.basis-bar b { font-size:12px; }
+.basis-bar span { font-size:10px; line-height:1.4; }
+footer { font-size:11px; line-height:1.5; }
+.no-match>p { font-size:12px; }
+.near-list>b { font-size:11px; }
+.near-list span { font-size:15px; }
+.near-list small,.empty-preview p { font-size:11px; }
+.dxf-dialog header span { font-size:10px; }
+.drawing-notes>b { font-size:18px; }
+.drawing-notes dt { font-size:10px; }
+.drawing-notes dd { font-size:12px; }
+.drawing-notes>p { font-size:10px; }
+.section-sketch text { font-size:9px; }
+.dxf-dialog>footer span { font-size:10px; }
+.dxf-dialog>footer button { font-size:13px; }
 @media(max-width:1050px){.workbench{grid-template-columns:1fr 1fr}.preview{grid-column:1/-1;min-height:580px}.results{border-right:0}.hero{grid-template-columns:1fr;gap:18px}.hero-copy{max-width:700px}.candidate-list{max-height:420px}}
 @media(max-width:760px){.dxf-sheet{grid-template-columns:1fr}.plan-sheet{border-right:0;border-bottom:1px solid var(--line)}.dxf-dialog>footer{align-items:flex-start;flex-direction:column}.dxf-dialog>footer button{margin:10px 0 0;width:100%}.basis-bar{grid-template-columns:1fr}.basis-bar div+div{border-left:0;border-top:1px solid var(--line)}}
 @media(max-width:680px){.shell{padding:0 14px 30px}.header{height:70px}.header p{display:none}.hero{padding:34px 0 24px}.hero h1{font-size:38px;letter-spacing:-1.5px}.workbench{grid-template-columns:1fr}.inputs,.results{border-right:0;border-bottom:1px solid var(--line)}.preview{grid-column:auto;min-height:570px}.input-groups{grid-template-columns:1fr}.drawing-data{grid-template-columns:1fr 1fr}.drawing-data div:last-child{grid-column:1/-1;border-left:0;border-top:1px solid #3c554f}.plan-dimension-grid{grid-template-columns:1fr}.plan-dimension-grid>span+span{border-left:0;border-top:1px solid var(--line)}.compact .plan-dimension-grid>span+span{border-color:#456159}.pressure-caption{white-space:normal;width:calc(100% - 16px);justify-content:center;text-align:center}footer{align-items:flex-start;flex-direction:column}.modal-backdrop{padding:8px}.dxf-dialog h2{font-size:19px}.modal-drawing{min-height:350px}}
