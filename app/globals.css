@@ -212,42 +212,43 @@ footer { font-size:11px; line-height:1.5; }
 @media(max-width:680px){
   .shell{padding:0 0 20px}
   .header{height:58px;padding:0 14px}
-  .brand{font-size:18px}.brand-ring{width:27px;height:27px;border-width:6px}
-  .header p{display:none}.material-chip{padding:6px 9px;font-size:9px}
+  .brand{font-size:20px}.brand-ring{width:29px;height:29px;border-width:6px}
+  .header p{display:none}.material-chip{padding:6px 9px;font-size:11px}
   .hero{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
-  .hero .kicker{display:none}.hero h1{margin:0;font-size:22px;letter-spacing:-.7px}
+  .hero .kicker{display:none}.hero h1{margin:0;font-size:24px;letter-spacing:-.7px}
   .hero-action>span{display:none}
-  .info-popover>div{position:fixed;z-index:60;top:74px;right:14px;left:14px;width:auto}
+  .info-popover>div{position:fixed;z-index:60;top:74px;right:14px;left:14px;width:auto;font-size:14px}
   .workbench{grid-template-columns:1fr;border-right:0;border-left:0;box-shadow:none}
   .inputs,.results,.preview{padding:14px}
   .inputs,.results{border-right:0;border-bottom:1px solid var(--line)}
   .section-head{gap:9px;padding-bottom:11px}
-  .section-head>span{width:28px;height:28px;font-size:10px}
-  .section-head b{font-size:16px}.section-head small{display:none}
-  .field-label{margin-top:12px;font-size:11px}
-  .segmented{padding:6px 0 8px}.segmented button{min-height:40px;padding:8px;font-size:13px}
+  .section-head>span{width:30px;height:30px;font-size:12px}
+  .section-head b{font-size:18px}.section-head small{display:none}
+  .field-label{margin-top:12px;font-size:13px}
+  .segmented{padding:6px 0 8px}.segmented button{min-height:42px;padding:8px;font-size:15px}
   .input-groups{grid-template-columns:1fr;gap:7px}
-  fieldset{padding:9px 10px}legend{font-size:11px}
+  fieldset{padding:9px 10px}legend{font-size:13px}
   .dimension-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
-  .dimension{min-height:40px;font-size:11px}
-  .dimension input{width:62px;font-size:15px}.dimension em{width:23px;font-size:10px}
+  .dimension{min-height:44px;font-size:13px}
+  .dimension input{width:68px;font-size:17px}.dimension em{width:25px;font-size:12px}
   .design-options{gap:8px;margin-top:10px;padding-top:10px}
-  .design-options label,.condition-row label{font-size:11px}
-  .design-options select,.condition-row select,.number-control{min-height:40px;margin-top:4px;font-size:13px}
+  .design-options label,.condition-row label{font-size:13px}
+  .design-options select,.condition-row select,.number-control{min-height:44px;margin-top:4px;font-size:16px}
+  .number-control input{font-size:17px}.number-control em{font-size:12px}
   .condition-row{gap:8px;margin-top:10px}
-  .input-meta{margin-top:8px;padding:7px 9px;font-size:10px}
-  .inline-warning{padding:8px 10px;font-size:11px}
-  .search-button,.dxf-button{min-height:46px;margin-top:10px;padding:11px 14px;font-size:14px}
-  .candidate-count{margin-top:12px;padding:8px 11px}.candidate-count b{font-size:20px}.candidate-count span{font-size:11px}
-  .candidate-select{margin-top:10px;font-size:11px}.candidate-select select{min-height:44px;font-size:13px}
-  .selected-candidate{padding:9px 10px}.selected-candidate>div b{font-size:16px}.selected-candidate>div span{font-size:10px}
+  .input-meta{margin-top:8px;padding:8px 9px;font-size:12px}
+  .inline-warning{padding:9px 10px;font-size:13px}
+  .search-button,.dxf-button{min-height:48px;margin-top:10px;padding:11px 14px;font-size:16px}
+  .candidate-count{margin-top:12px;padding:9px 11px}.candidate-count b{font-size:24px}.candidate-count span{font-size:13px}
+  .candidate-select{margin-top:10px;font-size:13px}.candidate-select select{min-height:48px;font-size:16px}
+  .selected-candidate{padding:10px}.selected-candidate>div b{font-size:19px}.selected-candidate>div span{font-size:12px}
   .preview{order:-2;position:sticky;z-index:30;top:0;grid-column:auto;align-self:start;min-height:0;padding:10px 14px 12px;border-bottom:1px solid #476059;box-shadow:0 10px 24px rgba(8,28,23,.22)}
   .inputs{order:-1}.results{order:0}
-  .preview-top{align-items:center}.preview .section-head{padding-bottom:7px}.drawing-status{font-size:9px;padding:0}
+  .preview-top{align-items:center}.preview .section-head{padding-bottom:7px}.drawing-status{font-size:11px;padding:0}
   .preview>.drawing.functional{min-height:168px;height:168px;margin:3px 0 0}
-  .preview .dxf-button{min-height:42px;margin-top:5px}
+  .preview .dxf-button{min-height:44px;margin-top:5px}
   .empty-preview{min-height:168px;padding:14px}
-  .preview-dimensions text{font-size:5.3px}.preview-dimensions .radius-summary{font-size:5px}
+  .preview-dimensions text{font-size:6.2px}.preview-dimensions .radius-summary{font-size:5.8px}
   .basis-bar,body>.basis-bar{display:none}
   .shell>footer{display:none}
   .plan-dimension-grid{grid-template-columns:1fr}
@@ -256,7 +257,7 @@ footer { font-size:11px; line-height:1.5; }
   .pressure-caption{white-space:normal;width:calc(100% - 16px);justify-content:center;text-align:center}
   .modal-backdrop{padding:0}
   .dxf-dialog{max-height:100vh;min-height:100vh}
-  .dxf-dialog h2{font-size:19px}.dxf-dialog>header{position:sticky;z-index:2;top:0;background:#f8f6ef}
+  .dxf-dialog h2{font-size:22px}.dxf-dialog>header{position:sticky;z-index:2;top:0;background:#f8f6ef}
   .modal-drawing{min-height:330px}
-  .drawing-notes{padding:20px 16px}
+  .drawing-notes{padding:20px 16px}.drawing-notes>b{font-size:20px}.drawing-notes dt{font-size:12px}.drawing-notes dd{font-size:14px}.drawing-notes>p{font-size:12px}
 }
