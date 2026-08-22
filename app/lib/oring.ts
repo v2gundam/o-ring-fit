@@ -14,6 +14,7 @@ export type SearchOptions = {
   grooveRadius?: number;
   csMm?: number | null;
   glandSection?: GlandSection;
+  fixedRoundDiameter?: number;
 };
 
 export type RoundGroovePositionInput = {
@@ -178,7 +179,7 @@ export function searchCandidates(input: ShapeInput, medium: Medium, pressureMode
   return { accepted, near: near.slice(0, 5) };
 }
 
-export function searchCandidatesForRoundGroovePosition(input: RoundGroovePositionInput, medium: Medium, pressureMode: PressureMode, options: Omit<SearchOptions, "grooveShape" | "grooveRadius"> = {}) {
+export function searchCandidatesForRoundGroovePosition(envelope: ShapeInput, input: RoundGroovePositionInput, medium: Medium, pressureMode: PressureMode, options: Omit<SearchOptions, "grooveShape" | "grooveRadius" | "fixedRoundDiameter"> = {}) {
   const accepted: Candidate[] = [];
   const near: NearCandidate[] = [];
   if (validateRoundGroovePosition(input).length) return { accepted, near };
@@ -191,14 +192,7 @@ export function searchCandidatesForRoundGroovePosition(input: RoundGroovePositio
     const centerDiameter = input.edge === "inner"
       ? input.diameter + profile.widthMm
       : input.diameter - profile.widthMm;
-    const fixedInput: RoundInput = {
-      shape: "round",
-      innerDiameter: centerDiameter - profile.widthMm,
-      outerDiameter: centerDiameter + profile.widthMm,
-      innerMargin: 0,
-      outerMargin: 0,
-    };
-    if (fixedInput.innerDiameter <= 0) {
+    if (centerDiameter - profile.widthMm <= 0) {
       near.push({
         dash: size.dash,
         idMm: size.idIn * INCH_TO_MM,
@@ -208,9 +202,10 @@ export function searchCandidatesForRoundGroovePosition(input: RoundGroovePositio
       });
       continue;
     }
-    const evaluated = evaluateSize(size, profile, fixedInput, pressureMode, {
+    const evaluated = evaluateSize(size, profile, envelope, pressureMode, {
       ...options,
       grooveShape: "round",
+      fixedRoundDiameter: centerDiameter,
     });
     if ("candidate" in evaluated) accepted.push(evaluated.candidate);
     else near.push(evaluated.near);
@@ -386,7 +381,9 @@ function solvePath(input: ShapeInput, grooveWidth: number, csMm: number, freeLen
   const supportOffset = pressureAnchored ? Math.PI * (grooveWidth - csMm) : 0;
   const targetGrooveLength = supportWall === "GROOVE OD" ? freeLength - supportOffset : freeLength + supportOffset;
   const geometry = grooveShape === "round"
-    ? solveRoundGroove(input, grooveWidth, targetGrooveLength)
+    ? options.fixedRoundDiameter === undefined
+      ? solveRoundGroove(input, grooveWidth, targetGrooveLength)
+      : solveFixedRoundGroove(input, grooveWidth, options.fixedRoundDiameter)
     : solveRectGroove(input, grooveWidth, csMm, targetGrooveLength, options.grooveRadius);
   if (!geometry.valid) return geometry;
   const pathLength = supportWall === "GROOVE OD"
@@ -405,6 +402,25 @@ function solveRoundGroove(input: ShapeInput, grooveWidth: number, targetGrooveLe
   if (minDiameter > maxDiameter || maxDiameter <= 0) return invalid(0, "원형 글랜드가 안쪽 경계를 감싸면서 바깥 경계 안에 들어갈 공간이 없습니다.");
 
   const diameter = clamp(targetGrooveLength / Math.PI, minDiameter, maxDiameter);
+  const groovePathLength = Math.PI * diameter;
+  return { valid: true as const, path: { shape: "round" as const, diameter }, pathLength: groovePathLength, groovePathLength, requiredStrain: 0, innerCornerRatio: null };
+}
+
+function solveFixedRoundGroove(input: ShapeInput, grooveWidth: number, diameter: number) {
+  const innerSafe = expandedInnerBoundary(input);
+  const outerSafe = insetOuterBoundary(input);
+  if (!innerSafe || !outerSafe) return invalid(0, "벽 여유를 적용한 뒤 유효한 허용 영역이 남지 않습니다.");
+
+  const minDiameter = 2 * (farthestRadius(innerSafe) + grooveWidth / 2);
+  const maxDiameter = 2 * (inscribedCircleRadius(outerSafe) - grooveWidth / 2);
+  if (minDiameter > maxDiameter || maxDiameter <= 0) return invalid(0, "원형 글랜드가 안쪽 경계를 감싸면서 바깥 경계 안에 들어갈 공간이 없습니다.");
+  if (diameter < minDiameter - 1e-9) {
+    return invalid(0, `지정한 홈 위치가 안쪽 금지 경계와 간섭합니다. 이 단면의 홈 중심경은 최소 ${minDiameter.toFixed(2)} mm여야 합니다.`);
+  }
+  if (diameter > maxDiameter + 1e-9) {
+    return invalid(0, `지정한 홈 위치가 바깥쪽 허용 경계를 벗어납니다. 이 단면의 홈 중심경은 최대 ${maxDiameter.toFixed(2)} mm여야 합니다.`);
+  }
+
   const groovePathLength = Math.PI * diameter;
   return { valid: true as const, path: { shape: "round" as const, diameter }, pathLength: groovePathLength, groovePathLength, requiredStrain: 0, innerCornerRatio: null };
 }

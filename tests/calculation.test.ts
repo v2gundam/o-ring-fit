@@ -99,7 +99,7 @@ test("사용자 지정 원형 홈 내경 또는 외경을 고정하고 반대쪽
       { edge: "outer" as const, diameter: designed.path.diameter + designed.profile.widthMm },
     ];
     for (const position of positions) {
-      const result = searchCandidatesForRoundGroovePosition(position, medium, pressureMode, { csMm: 3.53, glandSection: "rect" });
+      const result = searchCandidatesForRoundGroovePosition(round, position, medium, pressureMode, { csMm: 3.53, glandSection: "rect" });
       const matched = result.accepted.find((candidate) => candidate.dash === designed.dash);
       assert.ok(matched);
       assert.equal(matched.path.shape, "round");
@@ -115,10 +115,32 @@ test("사용자 지정 원형 홈 내경 또는 외경을 고정하고 반대쪽
 
 test("사용자 지정 홈 위치의 잘못된 지름과 외경 공간 부족을 검출한다", () => {
   assert.ok(validateRoundGroovePosition({ edge: "inner", diameter: 0 }).length > 0);
-  const tooSmall = searchCandidatesForRoundGroovePosition({ edge: "outer", diameter: 1 }, "vacuum", "internal_vacuum", { csMm: 3.53 });
+  const tooSmall = searchCandidatesForRoundGroovePosition(round, { edge: "outer", diameter: 1 }, "vacuum", "internal_vacuum", { csMm: 3.53 });
   assert.equal(tooSmall.accepted.length, 0);
   assert.ok(tooSmall.near.length > 0);
   assert.match(tooSmall.near[0].reason, /권장 홈 폭|공간/);
+});
+
+test("사용자 지정 홈 위치를 바꾸면 허용 영역 간섭과 오링 길이를 다시 검사한다", () => {
+  const automatic = searchCandidates(round, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 }).accepted[0];
+  assert.ok(automatic);
+  assert.equal(automatic.path.shape, "round");
+  if (automatic.path.shape !== "round") return;
+
+  const automaticInner = automatic.path.diameter - automatic.profile.widthMm;
+  const adjusted = searchCandidatesForRoundGroovePosition(round, { edge: "inner", diameter: automaticInner + 0.5 }, "vacuum", "internal_vacuum", { csMm: 3.53 });
+  const sameRing = adjusted.accepted.find((candidate) => candidate.dash === automatic.dash);
+  assert.ok(sameRing);
+  assert.ok(Math.abs(sameRing.strain) > 1e-5);
+  assert.equal(sameRing.lengthCheck.withinLimits, true);
+
+  const innerCollision = searchCandidatesForRoundGroovePosition(round, { edge: "inner", diameter: 101 }, "vacuum", "internal_vacuum", { csMm: 3.53 });
+  assert.equal(innerCollision.accepted.length, 0);
+  assert.match(innerCollision.near[0].reason, /안쪽 금지 경계|간섭/);
+
+  const outsideOuter = searchCandidatesForRoundGroovePosition(round, { edge: "outer", diameter: 119 }, "vacuum", "internal_vacuum", { csMm: 3.53 });
+  assert.equal(outsideOuter.accepted.length, 0);
+  assert.match(outsideOuter.near[0].reason, /바깥쪽 허용 경계|벗어/);
 });
 
 test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한다", () => {

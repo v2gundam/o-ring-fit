@@ -68,15 +68,11 @@ export default function Home() {
     edge: groovePositionMode === "custom_outer" ? "outer" as const : "inner" as const,
     diameter: groovePositionMode === "custom_outer" ? customOuterDiameter : customInnerDiameter,
   }), [groovePositionMode, customInnerDiameter, customOuterDiameter]);
-  const currentInput = useMemo<ShapeInput>(() => customGrooveMode
-    ? customGroovePosition.edge === "inner"
-      ? { shape: "round", innerDiameter: customGroovePosition.diameter, outerDiameter: customGroovePosition.diameter + 20, innerMargin: 0, outerMargin: 0 }
-      : { shape: "round", innerDiameter: Math.max(0.1, customGroovePosition.diameter - 20), outerDiameter: customGroovePosition.diameter, innerMargin: 0, outerMargin: 0 }
-    : shape === "round" ? round : rect,
-  [customGrooveMode, customGroovePosition.edge, customGroovePosition.diameter, shape, round, rect]);
+  const currentInput = useMemo<ShapeInput>(() => shape === "round" ? round : rect, [shape, round, rect]);
   const resolvedGrooveShape: GrooveShape = customGrooveMode ? "round" : grooveMode === "auto" ? shape : grooveMode;
   const errors = useMemo(() => {
-    const nextErrors = customGrooveMode ? validateRoundGroovePosition(customGroovePosition) : validateInput(currentInput);
+    const nextErrors = validateInput(currentInput);
+    if (customGrooveMode) nextErrors.push(...validateRoundGroovePosition(customGroovePosition));
     if (resolvedGrooveShape === "rect" && (!Number.isFinite(grooveRadius) || grooveRadius <= 0)) {
       nextErrors.push("둥근 사각형 홈의 중심선 R은 0보다 커야 합니다.");
     }
@@ -86,7 +82,7 @@ export default function Home() {
     () => {
       if (errors.length) return { accepted: [], near: [] };
       if (customGrooveMode) {
-        return searchCandidatesForRoundGroovePosition(customGroovePosition, medium, pressureMode, { csMm: csFilter, glandSection });
+        return searchCandidatesForRoundGroovePosition(currentInput, customGroovePosition, medium, pressureMode, { csMm: csFilter, glandSection });
       }
       return searchCandidates(currentInput, medium, pressureMode, {
         grooveShape: resolvedGrooveShape,
@@ -99,16 +95,6 @@ export default function Home() {
   );
   const orderedCandidates = useMemo(() => sortByDash(result.accepted), [result.accepted]);
   const selected = orderedCandidates.find((item) => item.dash === selectedDash) ?? orderedCandidates[0] ?? null;
-  const previewInput = useMemo<ShapeInput>(() => {
-    if (!customGrooveMode || !selected || selected.path.shape !== "round") return currentInput;
-    return {
-      shape: "round",
-      innerDiameter: selected.path.diameter - selected.profile.widthMm,
-      outerDiameter: selected.path.diameter + selected.profile.widthMm,
-      innerMargin: 0,
-      outerMargin: 0,
-    };
-  }, [customGrooveMode, currentInput, selected]);
   const cornerRadiusGuidance = useMemo(
     () => resolvedGrooveShape === "rect" ? getCornerRadiusGuidance(csFilter, medium, glandSection) : null,
     [resolvedGrooveShape, csFilter, medium, glandSection],
@@ -121,8 +107,8 @@ export default function Home() {
         : "ideal"
     : "auto";
   const dxf = useMemo(
-    () => selected ? buildDxf(selected, previewInput, pressureMode, medium) : "",
-    [selected, previewInput, pressureMode, medium],
+    () => selected ? buildDxf(selected, currentInput, pressureMode, medium) : "",
+    [selected, currentInput, pressureMode, medium],
   );
 
   function setRoundValue(key: keyof RoundInput, value: number) {
@@ -131,6 +117,14 @@ export default function Home() {
 
   function setRectValue(key: keyof RectInput, value: number) {
     setRect((previous) => ({ ...previous, [key]: value }));
+  }
+
+  function setPositionMode(nextMode: typeof groovePositionMode) {
+    if (nextMode !== "auto" && selected?.path.shape === "round") {
+      if (nextMode === "custom_inner") setCustomInnerDiameter(Number((selected.path.diameter - selected.profile.widthMm).toFixed(2)));
+      if (nextMode === "custom_outer") setCustomOuterDiameter(Number((selected.path.diameter + selected.profile.widthMm).toFixed(2)));
+    }
+    setGroovePositionMode(nextMode);
   }
 
   function setOperatingMode(nextMode: PressureMode) {
@@ -174,77 +168,73 @@ export default function Home() {
 
       <section className="workbench" aria-label="오링 설계 워크벤치">
         <section className="inputs">
-          <SectionHead number="01" title={customGrooveMode ? "기존 홈 입력" : "허용 영역"} subtitle={customGrooveMode ? "가공된 원형 홈에 맞는 오링 검색" : "글랜드 전체가 존재할 수 있는 범위"} />
+          <SectionHead number="01" title="허용 영역" subtitle="글랜드 전체가 존재할 수 있는 범위와 위치" />
 
           <label className="groove-position-select">오링 홈 위치
-            <select value={groovePositionMode} onChange={(event) => setGroovePositionMode(event.target.value as typeof groovePositionMode)} aria-label="오링 홈 위치 선택">
+            <select value={groovePositionMode} onChange={(event) => setPositionMode(event.target.value as typeof groovePositionMode)} aria-label="오링 홈 위치 선택">
               <option value="auto">자동 · 허용 영역에서 계산</option>
               <option value="custom_inner">사용자 지정(내경)</option>
               <option value="custom_outer">사용자 지정(외경)</option>
             </select>
           </label>
 
-          {customGrooveMode ? (
-            <>
-              <div className="input-groups single">
-                <fieldset>
-                  <legend><i className="outer-dot" /> 사용자 지정 원형 오링 홈 위치</legend>
-                  <div className="dimension-grid">
-                    {groovePositionMode === "custom_inner"
-                      ? <Dimension label="홈 내경" value={customInnerDiameter} onChange={setCustomInnerDiameter} />
-                      : <Dimension label="홈 외경" value={customOuterDiameter} onChange={setCustomOuterDiameter} />}
-                  </div>
-                </fieldset>
-              </div>
-              {selected && selected.path.shape === "round" && <div className="custom-groove-summary" aria-live="polite">
-                <span>자동 계산 반대쪽 {groovePositionMode === "custom_inner" ? "외경" : "내경"}<b>Ø {(groovePositionMode === "custom_inner" ? selected.path.diameter + selected.profile.widthMm : selected.path.diameter - selected.profile.widthMm).toFixed(2)} mm</b></span>
-                <span>권장 홈 폭 <b>{selected.profile.widthMm.toFixed(2)} mm</b></span>
-              </div>}
-            </>
-          ) : (
-            <>
-              <div className="field-label">허용 영역 형상</div>
-              <div className="segmented boundary-shape" aria-label="허용 영역 형상 선택">
-                <button type="button" className={shape === "round" ? "active" : ""} onClick={() => setShape("round")}>○ 원형</button>
-                <button type="button" className={shape === "rect" ? "active" : ""} onClick={() => setShape("rect")}>▢ 둥근 사각형</button>
-              </div>
+          <div className="field-label">허용 영역 형상</div>
+          <div className="segmented boundary-shape" aria-label="허용 영역 형상 선택">
+            <button type="button" className={shape === "round" ? "active" : ""} onClick={() => setShape("round")}>○ 원형</button>
+            <button type="button" className={shape === "rect" ? "active" : ""} onClick={() => setShape("rect")}>▢ 둥근 사각형</button>
+          </div>
 
-              {shape === "round" ? (
-                <div className="input-groups single">
-                  <fieldset>
-                    <legend><i className="inner-dot" /> 안쪽 금지 / 바깥쪽 허용</legend>
-                    <div className="dimension-grid">
-                      <Dimension label="챔버 내경" value={round.innerDiameter} onChange={(value) => setRoundValue("innerDiameter", value)} />
-                      <Dimension label="플랜지 외경" value={round.outerDiameter} onChange={(value) => setRoundValue("outerDiameter", value)} />
-                      <Dimension label="안쪽 벽 여유" value={round.innerMargin} onChange={(value) => setRoundValue("innerMargin", value)} />
-                      <Dimension label="바깥쪽 벽 여유" value={round.outerMargin} onChange={(value) => setRoundValue("outerMargin", value)} />
-                    </div>
-                  </fieldset>
+          {shape === "round" ? (
+            <div className="input-groups single">
+              <fieldset>
+                <legend><i className="inner-dot" /> 안쪽 금지 / 바깥쪽 허용</legend>
+                <div className="dimension-grid">
+                  <Dimension label="챔버 내경" value={round.innerDiameter} onChange={(value) => setRoundValue("innerDiameter", value)} />
+                  <Dimension label="플랜지 외경" value={round.outerDiameter} onChange={(value) => setRoundValue("outerDiameter", value)} />
+                  <Dimension label="안쪽 벽 여유" value={round.innerMargin} onChange={(value) => setRoundValue("innerMargin", value)} />
+                  <Dimension label="바깥쪽 벽 여유" value={round.outerMargin} onChange={(value) => setRoundValue("outerMargin", value)} />
                 </div>
-              ) : (
-                <div className="input-groups">
-                  <fieldset>
-                    <legend><i className="inner-dot" /> 안쪽 금지 경계</legend>
-                    <div className="dimension-grid">
-                      <Dimension label="가로" value={rect.innerWidth} onChange={(value) => setRectValue("innerWidth", value)} />
-                      <Dimension label="세로" value={rect.innerHeight} onChange={(value) => setRectValue("innerHeight", value)} />
-                      <Dimension label="모서리 R" value={rect.innerRadius} onChange={(value) => setRectValue("innerRadius", value)} />
-                      <Dimension label="벽 여유" value={rect.innerMargin} onChange={(value) => setRectValue("innerMargin", value)} />
-                    </div>
-                  </fieldset>
-                  <fieldset>
-                    <legend><i className="outer-dot" /> 바깥쪽 허용 경계</legend>
-                    <div className="dimension-grid">
-                      <Dimension label="가로" value={rect.outerWidth} onChange={(value) => setRectValue("outerWidth", value)} />
-                      <Dimension label="세로" value={rect.outerHeight} onChange={(value) => setRectValue("outerHeight", value)} />
-                      <Dimension label="모서리 R" value={rect.outerRadius} onChange={(value) => setRectValue("outerRadius", value)} />
-                      <Dimension label="벽 여유" value={rect.outerMargin} onChange={(value) => setRectValue("outerMargin", value)} />
-                    </div>
-                  </fieldset>
+              </fieldset>
+            </div>
+          ) : (
+            <div className="input-groups">
+              <fieldset>
+                <legend><i className="inner-dot" /> 안쪽 금지 경계</legend>
+                <div className="dimension-grid">
+                  <Dimension label="가로" value={rect.innerWidth} onChange={(value) => setRectValue("innerWidth", value)} />
+                  <Dimension label="세로" value={rect.innerHeight} onChange={(value) => setRectValue("innerHeight", value)} />
+                  <Dimension label="모서리 R" value={rect.innerRadius} onChange={(value) => setRectValue("innerRadius", value)} />
+                  <Dimension label="벽 여유" value={rect.innerMargin} onChange={(value) => setRectValue("innerMargin", value)} />
                 </div>
-              )}
-            </>
+              </fieldset>
+              <fieldset>
+                <legend><i className="outer-dot" /> 바깥쪽 허용 경계</legend>
+                <div className="dimension-grid">
+                  <Dimension label="가로" value={rect.outerWidth} onChange={(value) => setRectValue("outerWidth", value)} />
+                  <Dimension label="세로" value={rect.outerHeight} onChange={(value) => setRectValue("outerHeight", value)} />
+                  <Dimension label="모서리 R" value={rect.outerRadius} onChange={(value) => setRectValue("outerRadius", value)} />
+                  <Dimension label="벽 여유" value={rect.outerMargin} onChange={(value) => setRectValue("outerMargin", value)} />
+                </div>
+              </fieldset>
+            </div>
           )}
+
+          {customGrooveMode && <>
+            <div className="input-groups single custom-position-input">
+              <fieldset>
+                <legend><i className="outer-dot" /> 사용자 지정 원형 오링 홈 위치</legend>
+                <div className="dimension-grid">
+                  {groovePositionMode === "custom_inner"
+                    ? <Dimension label="홈 내경" value={customInnerDiameter} onChange={setCustomInnerDiameter} />
+                    : <Dimension label="홈 외경" value={customOuterDiameter} onChange={setCustomOuterDiameter} />}
+                </div>
+              </fieldset>
+            </div>
+            {selected && selected.path.shape === "round" && <div className="custom-groove-summary" aria-live="polite">
+              <span>자동 계산 반대쪽 {groovePositionMode === "custom_inner" ? "외경" : "내경"}<b>Ø {(groovePositionMode === "custom_inner" ? selected.path.diameter + selected.profile.widthMm : selected.path.diameter - selected.profile.widthMm).toFixed(2)} mm</b></span>
+              <span>권장 홈 폭 <b>{selected.profile.widthMm.toFixed(2)} mm</b></span>
+            </div>}
+          </>}
 
           <div className="design-options">
             <label>오링 단면 두께 (CS)
@@ -363,7 +353,7 @@ export default function Home() {
 
           {selected ? (
             <>
-              <PlanPreview candidate={selected} input={previewInput} pressureMode={pressureMode} showBoundaries={!customGrooveMode} />
+              <PlanPreview candidate={selected} input={currentInput} pressureMode={pressureMode} />
               <button type="button" className="dxf-button" onClick={() => setDxfOpen(true)}>상세 정보 · DXF <span>↗</span></button>
             </>
           ) : (
@@ -383,10 +373,9 @@ export default function Home() {
       {dxfOpen && selected && (
         <DxfDialog
           candidate={selected}
-          input={previewInput}
+          input={currentInput}
           pressureMode={pressureMode}
           medium={medium}
-          customGrooveMode={customGrooveMode}
           onClose={() => setDxfOpen(false)}
           onDownload={exportDxf}
         />
@@ -568,13 +557,13 @@ function GlandDimensions({ candidate, compact = false }: { candidate: Candidate;
   );
 }
 
-function DxfDialog({ candidate, input, pressureMode, medium, customGrooveMode = false, onClose, onDownload }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; medium: Medium; customGrooveMode?: boolean; onClose: () => void; onDownload: () => void }) {
+function DxfDialog({ candidate, input, pressureMode, medium, onClose, onDownload }: { candidate: Candidate; input: ShapeInput; pressureMode: PressureMode; medium: Medium; onClose: () => void; onDownload: () => void }) {
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.currentTarget === event.target) onClose(); }}>
       <section className="dxf-dialog" role="dialog" aria-modal="true" aria-labelledby="dxf-title">
         <header><div><span>R14 · mm · 2D</span><h2 id="dxf-title">DXF 가공 도면 미리보기</h2></div><button type="button" onClick={onClose} aria-label="닫기">×</button></header>
         <div className="dxf-sheet">
-          <div className="plan-sheet"><PlanPreview candidate={candidate} input={input} pressureMode={pressureMode} modal showBoundaries={!customGrooveMode} /></div>
+          <div className="plan-sheet"><PlanPreview candidate={candidate} input={input} pressureMode={pressureMode} modal /></div>
           <div className="drawing-notes">
             <b>O-RING FIT / FACE SEAL GLAND</b>
             <dl>
