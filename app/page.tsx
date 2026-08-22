@@ -684,17 +684,22 @@ function RadiusCallouts({ dimensions, extent, pad, compact, markerId }: {
   const elbowX = -extent / 2 - 5;
   const labelSpacing = Math.max(13, pad * 0.2);
   const labelTop = -labelSpacing;
+  const centerDimension = dimensions.find((dimension) => dimension.label === "중심") ?? dimensions[0];
+  const centerIndex = dimensions.indexOf(centerDimension);
+  const centerLabelY = labelTop + centerIndex * labelSpacing;
+  const cornerCenterX = -centerDimension.width / 2 + centerDimension.radius;
+  const cornerCenterY = -centerDimension.height / 2 + centerDimension.radius;
+  const targetX = cornerCenterX - centerDimension.radius / Math.SQRT2;
+  const targetY = cornerCenterY - centerDimension.radius / Math.SQRT2;
   return (
-    <g className="radius-callouts" aria-label="홈 모서리 R 지시선">
+    <g className="radius-callouts" aria-label="홈 중심선 R 지시선과 모서리 R 치수">
+      <g className="center-gland-dim">
+        <path className="radius-leader" d={`M ${elbowX} ${centerLabelY - 2} L ${targetX} ${targetY}`} markerEnd={`url(#${markerId})`} />
+      </g>
       {dimensions.map((dimension, index) => {
         const labelY = labelTop + index * labelSpacing;
-        const cornerCenterX = -dimension.width / 2 + dimension.radius;
-        const cornerCenterY = -dimension.height / 2 + dimension.radius;
-        const targetX = cornerCenterX - dimension.radius / Math.SQRT2;
-        const targetY = cornerCenterY - dimension.radius / Math.SQRT2;
         return (
           <g key={`radius-${dimension.label}`} className={dimension.className}>
-            <path className="radius-leader" d={`M ${elbowX} ${labelY - 2} L ${targetX} ${targetY}`} markerEnd={`url(#${markerId})`} />
             <text className="radius-label" x={elbowX - 3} y={labelY} textAnchor="end">{compact ? `${dimension.label} R${dimension.radius.toFixed(2)}` : `홈 ${dimension.label} R ${dimension.radius.toFixed(2)} mm`}</text>
           </g>
         );

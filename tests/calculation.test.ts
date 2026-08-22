@@ -311,7 +311,8 @@ test("사각형 홈 미리보기는 바깥·중심·안쪽 W 순서와 R 지시�
   const centerWidth = markup.indexOf("중심 W");
   const innerWidth = markup.indexOf("안쪽 W");
   assert.ok(outerWidth >= 0 && outerWidth < centerWidth && centerWidth < innerWidth);
-  assert.match(markup, /aria-label="홈 모서리 R 지시선"/);
+  assert.match(markup, /aria-label="홈 중심선 R 지시선과 모서리 R 치수"/);
+  assert.equal((markup.match(/class="radius-leader"/g) ?? []).length, 1);
   assert.match(markup, /marker-end="url\(#radius-arrow-main\)"/);
   assert.match(markup, /바깥 R[\d.]+/);
   assert.match(markup, /중심 R[\d.]+/);
