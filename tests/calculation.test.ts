@@ -57,6 +57,37 @@ test("내부 가압과 내부 진공은 각각 외경·내경 지지벽을 기�
   assert.notEqual(pressure.path.diameter, vacuum.path.diameter);
 });
 
+test("선정 오링의 ID와 CS로 자유 길이를 다시 계산해 최종 적용 형상과 독립적으로 대조한다", () => {
+  const cases = [
+    ...searchCandidates(round, "gas", "internal_pressure", { grooveShape: "round", csMm: 3.53 }).accepted,
+    ...searchCandidates(round, "vacuum", "internal_vacuum", { grooveShape: "round", csMm: 3.53 }).accepted,
+    ...searchCandidates(rect, "gas", "internal_pressure", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 }).accepted,
+    ...searchCandidates(rect, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 }).accepted,
+  ];
+  assert.ok(cases.length > 0);
+
+  for (const candidate of cases) {
+    const freeLength = Math.PI * (candidate.idMm + candidate.csMm);
+    const grooveLength = candidate.path.shape === "round"
+      ? Math.PI * candidate.path.diameter
+      : 2 * (candidate.path.width + candidate.path.height - 4 * candidate.path.radius) + 2 * Math.PI * candidate.path.radius;
+    const supportOffset = candidate.profile.section === "rect"
+      ? Math.PI * (candidate.profile.widthMm - candidate.csMm)
+      : 0;
+    const installedLength = candidate.supportWall === "GROOVE OD"
+      ? grooveLength + supportOffset
+      : grooveLength - supportOffset;
+    const strain = installedLength / freeLength - 1;
+
+    assert.ok(Math.abs(candidate.freeLengthMm - freeLength) < 1e-9);
+    assert.ok(Math.abs(candidate.groovePathLengthMm - grooveLength) < 1e-9);
+    assert.ok(Math.abs(candidate.pathLengthMm - installedLength) < 1e-9);
+    assert.ok(Math.abs(candidate.lengthCheck.differenceMm - (installedLength - freeLength)) < 1e-9);
+    assert.ok(Math.abs(candidate.strain - strain) < 1e-12);
+    assert.equal(candidate.lengthCheck.withinLimits, true);
+  }
+});
+
 test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한다", () => {
   const result = searchCandidates(rect, "gas", "internal_pressure", { grooveShape: "rect", grooveRadius: 20 });
   assert.ok(result.accepted.length > 1);
@@ -94,6 +125,7 @@ test("DXF는 R14·mm 헤더와 닫힌 둥근 사각형 가공 루프를 포함�
   assert.match(dxf, /\$INSUNITS\n70\n4/);
   assert.match(dxf, /0\nLWPOLYLINE[\s\S]*?70\n1/);
   assert.match(dxf, /8\nGROOVE_CUT/);
+  assert.match(dxf, /LENGTH CHECK: FREE [\d.]+ \/ APPLIED [\d.]+ \/ DELTA [+-][\d.]+ mm/);
   assert.match(dxf, /GLAND PLAN IN W[\d.]+ H[\d.]+ R[\d.]+ \/ CENTER W[\d.]+ H[\d.]+ R[\d.]+ \/ OUT W[\d.]+ H[\d.]+ R[\d.]+ mm/);
   assert.match(dxf, /0\nEOF/);
 });

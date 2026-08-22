@@ -70,6 +70,18 @@ export type PathGeometry =
   | { shape: "round"; diameter: number }
   | { shape: "rect"; width: number; height: number; radius: number };
 
+export type LengthFitCheck = {
+  freeCenterlineDiameterMm: number;
+  freeLengthMm: number;
+  groovePathLengthMm: number;
+  installedPathLengthMm: number;
+  differenceMm: number;
+  strain: number;
+  worstCompression: number;
+  worstStretch: number;
+  withinLimits: boolean;
+};
+
 export type Candidate = {
   dash: string;
   aliases: string[];
@@ -81,6 +93,7 @@ export type Candidate = {
   freeLengthMm: number;
   pathLengthMm: number;
   groovePathLengthMm: number;
+  lengthCheck: LengthFitCheck;
   strain: number;
   worstCompression: number;
   worstStretch: number;
@@ -203,8 +216,6 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
   const csMm = size.csIn * INCH_TO_MM;
   const csToleranceMm = size.csToleranceIn * INCH_TO_MM;
   const freeLengthMm = Math.PI * (idMm + csMm);
-  const freeMin = Math.PI * (idMm - idToleranceMm + csMm - csToleranceMm);
-  const freeMax = Math.PI * (idMm + idToleranceMm + csMm + csToleranceMm);
   const supportWall: Candidate["supportWall"] = pressureMode === "internal_pressure" ? "GROOVE OD" : "GROOVE ID";
   const pressureAnchored = profile.section === "rect";
   const geometry = solvePath(input, profile.widthMm, csMm, freeLengthMm, supportWall, pressureAnchored, options);
@@ -213,10 +224,17 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
     return { near: { dash: size.dash, idMm, csMm, requiredStrain: geometry.requiredStrain, reason: geometry.reason } };
   }
 
-  const strain = geometry.pathLength / freeLengthMm - 1;
-  const worstStretch = geometry.pathLength / freeMin - 1;
-  const worstCompression = geometry.pathLength / freeMax - 1;
-  if (worstStretch > MAX_STRETCH || worstCompression < -MAX_CIRCUMFERENTIAL_COMPRESSION) {
+  const lengthCheck = verifyLengthFit({
+    idMm,
+    idToleranceMm,
+    csMm,
+    csToleranceMm,
+    profile,
+    path: geometry.path,
+    supportWall,
+  });
+  const { strain, worstStretch, worstCompression } = lengthCheck;
+  if (!lengthCheck.withinLimits) {
     const reason = worstStretch > MAX_STRETCH
       ? `공차 최악조건 신장률 ${(worstStretch * 100).toFixed(1)}%가 5%를 초과합니다.`
       : `공차 최악조건 둘레 압축률 ${Math.abs(worstCompression * 100).toFixed(1)}%가 3%를 초과합니다.`;
@@ -246,9 +264,10 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
     csMm,
     csToleranceMm,
     odMm: idMm + 2 * csMm,
-    freeLengthMm,
-    pathLengthMm: geometry.pathLength,
-    groovePathLengthMm: geometry.groovePathLength,
+    freeLengthMm: lengthCheck.freeLengthMm,
+    pathLengthMm: lengthCheck.installedPathLengthMm,
+    groovePathLengthMm: lengthCheck.groovePathLengthMm,
+    lengthCheck,
     strain,
     worstCompression,
     worstStretch,
@@ -262,6 +281,50 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
     score: Math.abs(strain) * 100 + (ratio !== null && ratio < 6 ? 0.35 : 0) + warnings.length * 0.08,
   };
   return { candidate };
+}
+
+/**
+ * 선택한 오링의 ID와 CS에서 자유 상태 중심선 길이를 다시 계산하고,
+ * 최종 생성된 홈 형상의 실제 둘레와 독립적으로 비교한다.
+ */
+export function verifyLengthFit(input: {
+  idMm: number;
+  idToleranceMm: number;
+  csMm: number;
+  csToleranceMm: number;
+  profile: GlandProfile;
+  path: PathGeometry;
+  supportWall: Candidate["supportWall"];
+}): LengthFitCheck {
+  const freeCenterlineDiameterMm = input.idMm + input.csMm;
+  const freeLengthMm = Math.PI * freeCenterlineDiameterMm;
+  const freeMin = Math.PI * (input.idMm - input.idToleranceMm + input.csMm - input.csToleranceMm);
+  const freeMax = Math.PI * (input.idMm + input.idToleranceMm + input.csMm + input.csToleranceMm);
+  const groovePathLengthMm = pathPerimeter(input.path);
+
+  // 직사각 면 씰 홈에서는 압력으로 오링이 지지벽에 붙은 위치의 중심선으로 검사한다.
+  // 도브테일 계열은 홈 평균경/중심 경로 기준을 유지한다.
+  const supportOffset = input.profile.section === "rect"
+    ? Math.PI * (input.profile.widthMm - input.csMm)
+    : 0;
+  const installedPathLengthMm = input.supportWall === "GROOVE OD"
+    ? groovePathLengthMm + supportOffset
+    : groovePathLengthMm - supportOffset;
+  const strain = installedPathLengthMm / freeLengthMm - 1;
+  const worstStretch = installedPathLengthMm / freeMin - 1;
+  const worstCompression = installedPathLengthMm / freeMax - 1;
+
+  return {
+    freeCenterlineDiameterMm,
+    freeLengthMm,
+    groovePathLengthMm,
+    installedPathLengthMm,
+    differenceMm: installedPathLengthMm - freeLengthMm,
+    strain,
+    worstCompression,
+    worstStretch,
+    withinLimits: worstStretch <= MAX_STRETCH && worstCompression >= -MAX_CIRCUMFERENTIAL_COMPRESSION,
+  };
 }
 
 function solvePath(input: ShapeInput, grooveWidth: number, csMm: number, freeLength: number, supportWall: Candidate["supportWall"], pressureAnchored: boolean, options: SearchOptions) {
@@ -541,6 +604,12 @@ function getLegacyAliases(dash: number) {
 
 function roundedRectPerimeter(width: number, height: number, radius: number) {
   return 2 * (width + height - 4 * radius) + 2 * Math.PI * radius;
+}
+
+function pathPerimeter(path: PathGeometry) {
+  return path.shape === "round"
+    ? Math.PI * path.diameter
+    : roundedRectPerimeter(path.width, path.height, path.radius);
 }
 
 function invalid(requiredStrain: number, reason: string) {

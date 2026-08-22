@@ -278,7 +278,11 @@ export default function Home() {
               </label>
               {selected && (
                 <div className="selected-candidate">
-                  <div><b>AS568-{selected.dash}</b><span>ID {selected.idMm.toFixed(2)} × CS {selected.csMm.toFixed(2)} mm</span></div>
+                  <div>
+                    <b>AS568-{selected.dash}</b>
+                    <span>ID {selected.idMm.toFixed(2)} × CS {selected.csMm.toFixed(2)} mm</span>
+                    <span>길이 재검증 · 자유 {selected.freeLengthMm.toFixed(2)} → 적용 {selected.pathLengthMm.toFixed(2)} mm · Δ {formatSigned(selected.lengthCheck.differenceMm)} mm</span>
+                  </div>
                   <span className={`fit-badge ${selected.state}`}>{selected.label}</span>
                 </div>
               )}
@@ -516,7 +520,8 @@ function DxfDialog({ candidate, input, pressureMode, medium, onClose, onDownload
               <div><dt>RANGE</dt><dd>최대폭 {candidate.profile.widthMinMm.toFixed(2)}–{candidate.profile.widthMaxMm.toFixed(2)} / 깊이 {candidate.profile.depthMinMm.toFixed(2)}–{candidate.profile.depthMaxMm.toFixed(2)} mm</dd></div>
               <div><dt>INSTALL</dt><dd>{candidate.label} · {supportWallKo(candidate.supportWall)} 지지</dd></div>
               <div><dt>SQUEEZE</dt><dd>{candidate.profile.squeezePercent.toFixed(1)}%</dd></div>
-              <div><dt>PATH</dt><dd>오링 설치 중심선 {candidate.pathLengthMm.toFixed(2)} / 홈 중심 경로 {candidate.groovePathLengthMm.toFixed(2)} mm</dd></div>
+              <div><dt>LENGTH</dt><dd>π × (ID + CS) = {candidate.freeLengthMm.toFixed(2)} / 적용 형상 = {candidate.pathLengthMm.toFixed(2)} mm · Δ {formatSigned(candidate.lengthCheck.differenceMm)} mm</dd></div>
+              <div><dt>PATH</dt><dd>홈 중심 경로 {candidate.groovePathLengthMm.toFixed(2)} mm · 공차 변형률 {formatSigned(candidate.worstCompression * 100)}%–{formatSigned(candidate.worstStretch * 100)}%</dd></div>
               <div><dt>MEDIA</dt><dd>{mediumLabel(medium)} · {pressureModeLabel(pressureMode)}</dd></div>
               <div><dt>MATERIAL</dt><dd>FKM (Viton™), hardness/compound TBD</dd></div>
             </dl>
@@ -559,6 +564,7 @@ function CrossSection({ candidate }: { candidate: Candidate }) {
 }
 
 function supportWallKo(value: Candidate["supportWall"]) { return value === "GROOVE OD" ? "홈 외경벽" : "홈 내경벽"; }
+function formatSigned(value: number) { return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`; }
 function pressureModeLabel(value: PressureMode) {
   if (value === "internal_pressure") return "내부 가압";
   if (value === "external_pressure") return "외부 가압";
