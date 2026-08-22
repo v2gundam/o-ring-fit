@@ -6,6 +6,7 @@ import {
   searchCandidates,
   validateInput,
   type Candidate,
+  type GrooveShape,
   type Medium,
   type PressureMode,
   type RectInput,
@@ -35,7 +36,8 @@ const initialRect: RectInput = {
 
 const initialMode: PressureMode = "internal_vacuum";
 const initialMedium: Medium = "vacuum";
-const initialSearch = searchCandidates(initialRound, initialMedium, initialMode);
+const initialSearch = searchCandidates(initialRound, initialMedium, initialMode, { grooveShape: "round" });
+const crossSections = [1.78, 2.62, 3.53, 5.33, 6.99];
 
 export default function Home() {
   const [shape, setShape] = useState<"round" | "rect">("round");
@@ -43,6 +45,9 @@ export default function Home() {
   const [rect, setRect] = useState(initialRect);
   const [pressureMode, setPressureMode] = useState<PressureMode>(initialMode);
   const [medium, setMedium] = useState<Medium>(initialMedium);
+  const [grooveMode, setGrooveMode] = useState<"auto" | GrooveShape>("auto");
+  const [grooveRadius, setGrooveRadius] = useState(20);
+  const [csFilter, setCsFilter] = useState<number | null>(null);
   const [result, setResult] = useState(initialSearch);
   const [selectedDash, setSelectedDash] = useState(initialSearch.accepted[0]?.dash ?? "");
   const [errors, setErrors] = useState<string[]>([]);
@@ -53,6 +58,7 @@ export default function Home() {
 
   const selected = result.accepted.find((item) => item.dash === selectedDash) ?? result.accepted[0] ?? null;
   const currentInput: ShapeInput = shape === "round" ? round : rect;
+  const resolvedGrooveShape: GrooveShape = grooveMode === "auto" ? shape : grooveMode;
   const dxf = useMemo(
     () => selected ? buildDxf(selected, searchedInput, searchedMode, searchedMedium) : "",
     [selected, searchedInput, searchedMode, searchedMedium],
@@ -60,10 +66,17 @@ export default function Home() {
 
   function runSearch() {
     const nextErrors = validateInput(currentInput);
+    if (resolvedGrooveShape === "rect" && (!Number.isFinite(grooveRadius) || grooveRadius <= 0)) {
+      nextErrors.push("둥근 사각형 홈의 중심선 R은 0보다 커야 합니다.");
+    }
     setErrors(nextErrors);
     setDxfOpen(false);
     if (nextErrors.length) return;
-    const next = searchCandidates(currentInput, medium, pressureMode);
+    const next = searchCandidates(currentInput, medium, pressureMode, {
+      grooveShape: resolvedGrooveShape,
+      grooveRadius: resolvedGrooveShape === "rect" ? grooveRadius : undefined,
+      csMm: csFilter,
+    });
     setResult(next);
     setSelectedDash(next.accepted[0]?.dash ?? "");
     setSearchedInput(currentInput);
@@ -110,7 +123,8 @@ export default function Home() {
         <section className="inputs">
           <SectionHead number="01" title="허용 영역" subtitle="글랜드 전체가 존재할 수 있는 범위" />
 
-          <div className="segmented" aria-label="형상 선택">
+          <div className="field-label">허용 영역 형상</div>
+          <div className="segmented boundary-shape" aria-label="허용 영역 형상 선택">
             <button type="button" className={shape === "round" ? "active" : ""} onClick={() => setShape("round")}>○ 원형</button>
             <button type="button" className={shape === "rect" ? "active" : ""} onClick={() => setShape("rect")}>▢ 둥근 사각형</button>
           </div>
@@ -143,6 +157,34 @@ export default function Home() {
               </fieldset>
             </div>
           )}
+
+          <div className="design-options">
+            <label>오링 단면 두께 (CS)
+              <select value={csFilter ?? "auto"} onChange={(event) => setCsFilter(event.target.value === "auto" ? null : Number(event.target.value))}>
+                <option value="auto">자동 · 전체 단면</option>
+                {crossSections.map((value) => <option key={value} value={value}>{value.toFixed(2)} mm</option>)}
+              </select>
+            </label>
+            <label>오링 홈 형상
+              <select value={grooveMode} onChange={(event) => setGrooveMode(event.target.value as "auto" | GrooveShape)}>
+                <option value="auto">자동 · 허용 영역과 동일</option>
+                <option value="round">원형</option>
+                <option value="rect">둥근 사각형</option>
+              </select>
+            </label>
+            {resolvedGrooveShape === "rect" && (
+              <label>홈 중심선 모서리 R
+                <span className="number-control"><input type="number" min="0.1" step="0.5" value={grooveRadius} onChange={(event) => setGrooveRadius(event.target.valueAsNumber)} /><em>mm</em></span>
+              </label>
+            )}
+          </div>
+
+          <div className="auto-shape-note">
+            <b>{shape === "round" ? "원형" : "둥근 사각형"} 허용 영역</b>
+            <span>→</span>
+            <b>{resolvedGrooveShape === "round" ? "원형 홈" : "둥근 사각형 홈"}</b>
+            {grooveMode === "auto" && <em>자동 적용</em>}
+          </div>
 
           <div className="condition-row">
             <label>압력 방향

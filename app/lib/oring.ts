@@ -6,6 +6,13 @@ const MAX_CIRCUMFERENTIAL_COMPRESSION = 0.03;
 
 export type PressureMode = "internal_pressure" | "internal_vacuum" | "external_pressure";
 export type Medium = "liquid" | "gas" | "vacuum";
+export type GrooveShape = "round" | "rect";
+
+export type SearchOptions = {
+  grooveShape?: GrooveShape;
+  grooveRadius?: number;
+  csMm?: number | null;
+};
 
 export type RoundInput = {
   shape: "round";
@@ -92,15 +99,16 @@ const FACE_SEAL_PROFILES: Record<string, InchProfile> = {
   "0.275": { depth: [0.201, 0.211], liquidWidth: [0.342, 0.362], gasWidth: [0.309, 0.314], radius: [0.020, 0.035] },
 };
 
-export function searchCandidates(input: ShapeInput, medium: Medium, pressureMode: PressureMode) {
+export function searchCandidates(input: ShapeInput, medium: Medium, pressureMode: PressureMode, options: SearchOptions = {}) {
   const accepted: Candidate[] = [];
   const near: NearCandidate[] = [];
 
   for (const size of AS568_SIZES) {
     if (Number(size.dash) >= 900) continue;
+    if (options.csMm && Math.abs(size.csIn * INCH_TO_MM - options.csMm) > 0.03) continue;
     const profile = getGlandProfile(size, medium);
     if (!profile) continue;
-    const evaluated = evaluateSize(size, profile, input, pressureMode);
+    const evaluated = evaluateSize(size, profile, input, pressureMode, options);
     if ("candidate" in evaluated) accepted.push(evaluated.candidate);
     else near.push(evaluated.near);
   }
@@ -129,7 +137,7 @@ export function validateInput(input: ShapeInput): string[] {
   return errors;
 }
 
-function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput, pressureMode: PressureMode): { candidate: Candidate } | { near: NearCandidate } {
+function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput, pressureMode: PressureMode, options: SearchOptions): { candidate: Candidate } | { near: NearCandidate } {
   const idMm = size.idIn * INCH_TO_MM;
   const idToleranceMm = size.idToleranceIn * INCH_TO_MM;
   const csMm = size.csIn * INCH_TO_MM;
@@ -137,7 +145,7 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
   const freeLengthMm = Math.PI * (idMm + csMm);
   const freeMin = Math.PI * (idMm - idToleranceMm + csMm - csToleranceMm);
   const freeMax = Math.PI * (idMm + idToleranceMm + csMm + csToleranceMm);
-  const geometry = solvePath(input, profile.widthMm, csMm, freeLengthMm);
+  const geometry = solvePath(input, profile.widthMm, csMm, freeLengthMm, options);
 
   if (!geometry.valid || !geometry.path) {
     return { near: { dash: size.dash, idMm, csMm, requiredStrain: geometry.requiredStrain, reason: geometry.reason } };
@@ -190,48 +198,215 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
   return { candidate };
 }
 
-function solvePath(input: ShapeInput, grooveWidth: number, csMm: number, freeLength: number) {
-  if (input.shape === "round") {
-    const minDiameter = input.innerDiameter + 2 * input.innerMargin + grooveWidth;
-    const maxDiameter = input.outerDiameter - 2 * input.outerMargin - grooveWidth;
-    const freeDiameter = freeLength / Math.PI;
-    if (minDiameter > maxDiameter) return invalid(0, "글랜드 폭과 벽 여유를 확보할 공간이 없습니다.");
-    const diameter = clamp(freeDiameter, minDiameter, maxDiameter);
-    const pathLength = Math.PI * diameter;
-    const requiredStrain = pathLength / freeLength - 1;
-    if (requiredStrain > MAX_STRETCH || requiredStrain < -MAX_CIRCUMFERENTIAL_COMPRESSION) return invalid(requiredStrain, requiredStrain > 0 ? "허용 영역에 넣으려면 과도한 신장이 필요합니다." : "허용 영역에 넣으려면 과도한 둘레 압축이 필요합니다.");
-    return { valid: true as const, path: { shape: "round" as const, diameter }, pathLength, requiredStrain, innerCornerRatio: null };
+function solvePath(input: ShapeInput, grooveWidth: number, csMm: number, freeLength: number, options: SearchOptions) {
+  const grooveShape = options.grooveShape ?? input.shape;
+  if (grooveShape === "round") return solveRoundGroove(input, grooveWidth, freeLength);
+  return solveRectGroove(input, grooveWidth, csMm, freeLength, options.grooveRadius);
+}
+
+function solveRoundGroove(input: ShapeInput, grooveWidth: number, freeLength: number) {
+  const innerSafe = expandedInnerBoundary(input);
+  const outerSafe = insetOuterBoundary(input);
+  if (!innerSafe || !outerSafe) return invalid(0, "벽 여유를 적용한 뒤 유효한 허용 영역이 남지 않습니다.");
+
+  const minDiameter = 2 * (farthestRadius(innerSafe) + grooveWidth / 2);
+  const maxDiameter = 2 * (inscribedCircleRadius(outerSafe) - grooveWidth / 2);
+  if (minDiameter > maxDiameter || maxDiameter <= 0) return invalid(0, "원형 글랜드가 안쪽 경계를 감싸면서 바깥 경계 안에 들어갈 공간이 없습니다.");
+
+  const diameter = clamp(freeLength / Math.PI, minDiameter, maxDiameter);
+  const pathLength = Math.PI * diameter;
+  const requiredStrain = pathLength / freeLength - 1;
+  if (!strainAllowed(requiredStrain)) return invalid(requiredStrain, strainReason(requiredStrain, "원형"));
+  return { valid: true as const, path: { shape: "round" as const, diameter }, pathLength, requiredStrain, innerCornerRatio: null };
+}
+
+function solveRectGroove(input: ShapeInput, grooveWidth: number, csMm: number, freeLength: number, requestedRadius?: number) {
+  const innerSafe = expandedInnerBoundary(input);
+  const outerSafe = insetOuterBoundary(input);
+  if (!innerSafe || !outerSafe) return invalid(0, "벽 여유를 적용한 뒤 유효한 허용 영역이 남지 않습니다.");
+
+  const radius = requestedRadius ?? automaticGrooveRadius(input, grooveWidth, csMm);
+  const innerCornerRadius = radius - grooveWidth / 2;
+  if (!Number.isFinite(radius) || radius <= 0) return invalid(0, "둥근 사각형 글랜드의 중심선 R은 0보다 커야 합니다.");
+  if (innerCornerRadius < 3 * csMm) return invalid(0, `홈 안쪽 R ${(innerCornerRadius).toFixed(2)} mm가 최소 3×CS인 ${(3 * csMm).toFixed(2)} mm보다 작습니다.`);
+
+  const rawStart = input.shape === "round"
+    ? { width: innerSafe.radius * 2 + grooveWidth, height: innerSafe.radius * 2 + grooveWidth }
+    : { width: innerSafe.width + grooveWidth, height: innerSafe.height + grooveWidth };
+  const start = { width: Math.max(rawStart.width, 2 * radius), height: Math.max(rawStart.height, 2 * radius) };
+  const end = input.shape === "round"
+    ? { width: outerSafe.radius * 2 - grooveWidth, height: outerSafe.radius * 2 - grooveWidth }
+    : { width: outerSafe.width - grooveWidth, height: outerSafe.height - grooveWidth };
+
+  if (start.width > end.width || start.height > end.height || end.width <= 0 || end.height <= 0) {
+    return invalid(0, "둥근 사각형 글랜드의 폭과 벽 여유를 확보할 공간이 없습니다.");
   }
+  if (radius * 2 > Math.min(end.width, end.height)) return invalid(0, "입력한 홈 중심선 R이 사용 가능한 가로·세로보다 큽니다.");
 
-  const minWidth = input.innerWidth + 2 * input.innerMargin + grooveWidth;
-  const minHeight = input.innerHeight + 2 * input.innerMargin + grooveWidth;
-  const maxWidth = input.outerWidth - 2 * input.outerMargin - grooveWidth;
-  const maxHeight = input.outerHeight - 2 * input.outerMargin - grooveWidth;
-  const minRadius = Math.max(input.innerRadius + input.innerMargin + grooveWidth / 2, 3 * csMm + grooveWidth / 2);
-  const maxRadius = input.outerRadius - input.outerMargin - grooveWidth / 2;
-
-  if (minWidth > maxWidth || minHeight > maxHeight) return invalid(0, "글랜드 폭과 벽 여유를 확보할 사각형 띠 공간이 없습니다.");
-  if (minRadius > maxRadius) return invalid(0, `모서리 반경이 부족합니다. 실제 안쪽 R은 최소 ${(3 * csMm).toFixed(2)} mm가 필요합니다.`);
-
-  const start = { width: minWidth, height: minHeight, radius: minRadius };
-  const end = { width: maxWidth, height: maxHeight, radius: maxRadius };
-  const p0 = roundedRectPerimeter(start.width, start.height, start.radius);
-  const p1 = roundedRectPerimeter(end.width, end.height, end.radius);
-  const low = Math.min(p0, p1);
-  const high = Math.max(p0, p1);
-  const target = clamp(freeLength, low, high);
-  const t = Math.abs(p1 - p0) < 1e-9 ? 0.5 : clamp((target - p0) / (p1 - p0), 0, 1);
-  const path = {
+  const makePath = (t: number) => ({
     shape: "rect" as const,
     width: lerp(start.width, end.width, t),
     height: lerp(start.height, end.height, t),
-    radius: lerp(start.radius, end.radius, t),
-  };
+    radius,
+  });
+  const innerFits = (t: number) => grooveInnerContains(makePath(t), grooveWidth, innerSafe);
+  const outerFits = (t: number) => grooveOuterInside(makePath(t), grooveWidth, outerSafe);
+
+  if (!innerFits(1)) return invalid(0, "입력한 홈 R로는 안쪽 금지 경계를 피할 수 없습니다.");
+  if (!outerFits(0)) return invalid(0, "입력한 홈 R의 바깥 모서리가 허용 경계를 벗어납니다.");
+
+  const tMin = findFirstTrue(innerFits);
+  const tMax = findLastTrue(outerFits);
+  if (tMin > tMax + 1e-7) return invalid(0, "안쪽·바깥쪽 경계와 벽 여유를 동시에 만족하는 둥근 사각형 글랜드가 없습니다.");
+
+  const p0 = roundedRectPerimeter(makePath(tMin).width, makePath(tMin).height, radius);
+  const p1 = roundedRectPerimeter(makePath(tMax).width, makePath(tMax).height, radius);
+  const target = clamp(freeLength, Math.min(p0, p1), Math.max(p0, p1));
+  const t = Math.abs(p1 - p0) < 1e-9 ? (tMin + tMax) / 2 : clamp(tMin + (target - p0) * (tMax - tMin) / (p1 - p0), tMin, tMax);
+  const path = makePath(t);
   const pathLength = roundedRectPerimeter(path.width, path.height, path.radius);
   const requiredStrain = pathLength / freeLength - 1;
-  if (requiredStrain > MAX_STRETCH || requiredStrain < -MAX_CIRCUMFERENTIAL_COMPRESSION) return invalid(requiredStrain, requiredStrain > 0 ? "사각형 허용 영역에 넣으려면 과도한 신장이 필요합니다." : "사각형 허용 영역에 넣으려면 과도한 둘레 압축이 필요합니다.");
-  const innerCornerRadius = path.radius - grooveWidth / 2;
+  if (!strainAllowed(requiredStrain)) return invalid(requiredStrain, strainReason(requiredStrain, "둥근 사각형"));
   return { valid: true as const, path, pathLength, requiredStrain, innerCornerRatio: innerCornerRadius / csMm };
+}
+
+type BoundaryGeometry =
+  | { shape: "round"; radius: number }
+  | { shape: "rect"; width: number; height: number; radius: number };
+
+function expandedInnerBoundary(input: ShapeInput): BoundaryGeometry {
+  if (input.shape === "round") return { shape: "round", radius: input.innerDiameter / 2 + input.innerMargin };
+  return {
+    shape: "rect",
+    width: input.innerWidth + 2 * input.innerMargin,
+    height: input.innerHeight + 2 * input.innerMargin,
+    radius: input.innerRadius + input.innerMargin,
+  };
+}
+
+function insetOuterBoundary(input: ShapeInput): BoundaryGeometry | null {
+  if (input.shape === "round") {
+    const radius = input.outerDiameter / 2 - input.outerMargin;
+    return radius > 0 ? { shape: "round", radius } : null;
+  }
+  const width = input.outerWidth - 2 * input.outerMargin;
+  const height = input.outerHeight - 2 * input.outerMargin;
+  if (width <= 0 || height <= 0) return null;
+  return {
+    shape: "rect",
+    width,
+    height,
+    radius: clamp(input.outerRadius - input.outerMargin, 0, Math.min(width, height) / 2),
+  };
+}
+
+function farthestRadius(shape: BoundaryGeometry) {
+  if (shape.shape === "round") return shape.radius;
+  const cornerX = shape.width / 2 - shape.radius;
+  const cornerY = shape.height / 2 - shape.radius;
+  return Math.hypot(cornerX, cornerY) + shape.radius;
+}
+
+function inscribedCircleRadius(shape: BoundaryGeometry) {
+  return shape.shape === "round" ? shape.radius : Math.min(shape.width, shape.height) / 2;
+}
+
+function grooveInnerContains(path: Extract<PathGeometry, { shape: "rect" }>, grooveWidth: number, innerSafe: BoundaryGeometry) {
+  const width = path.width - grooveWidth;
+  const height = path.height - grooveWidth;
+  const radius = path.radius - grooveWidth / 2;
+  if (width <= 0 || height <= 0 || radius < 0 || radius * 2 > Math.min(width, height)) return false;
+  return shapeContains({ shape: "rect", width, height, radius }, innerSafe);
+}
+
+function grooveOuterInside(path: Extract<PathGeometry, { shape: "rect" }>, grooveWidth: number, outerSafe: BoundaryGeometry) {
+  const outerEdge: BoundaryGeometry = {
+    shape: "rect",
+    width: path.width + grooveWidth,
+    height: path.height + grooveWidth,
+    radius: path.radius + grooveWidth / 2,
+  };
+  return shapeContains(outerSafe, outerEdge);
+}
+
+function shapeContains(container: BoundaryGeometry, contained: BoundaryGeometry) {
+  return boundaryPoints(contained).every(([x, y]) => pointInside(container, x, y));
+}
+
+function pointInside(shape: BoundaryGeometry, x: number, y: number) {
+  if (shape.shape === "round") return Math.hypot(x, y) <= shape.radius + 1e-7;
+  const radius = clamp(shape.radius, 0, Math.min(shape.width, shape.height) / 2);
+  const qx = Math.abs(x) - (shape.width / 2 - radius);
+  const qy = Math.abs(y) - (shape.height / 2 - radius);
+  const outside = Math.hypot(Math.max(qx, 0), Math.max(qy, 0)) + Math.min(Math.max(qx, qy), 0) - radius;
+  return outside <= 1e-7;
+}
+
+function boundaryPoints(shape: BoundaryGeometry): Array<[number, number]> {
+  if (shape.shape === "round") {
+    return Array.from({ length: 128 }, (_, index) => {
+      const angle = index * Math.PI * 2 / 128;
+      return [Math.cos(angle) * shape.radius, Math.sin(angle) * shape.radius] as [number, number];
+    });
+  }
+  const points: Array<[number, number]> = [];
+  const halfWidth = shape.width / 2;
+  const halfHeight = shape.height / 2;
+  const radius = clamp(shape.radius, 0, Math.min(shape.width, shape.height) / 2);
+  if (radius < 1e-9) return [[-halfWidth, -halfHeight], [halfWidth, -halfHeight], [halfWidth, halfHeight], [-halfWidth, halfHeight]];
+  const centers: Array<[number, number, number]> = [
+    [halfWidth - radius, halfHeight - radius, 0],
+    [-halfWidth + radius, halfHeight - radius, Math.PI / 2],
+    [-halfWidth + radius, -halfHeight + radius, Math.PI],
+    [halfWidth - radius, -halfHeight + radius, Math.PI * 1.5],
+  ];
+  for (const [cx, cy, start] of centers) {
+    for (let index = 0; index <= 32; index++) {
+      const angle = start + index * Math.PI / 2 / 32;
+      points.push([cx + Math.cos(angle) * radius, cy + Math.sin(angle) * radius]);
+    }
+  }
+  return points;
+}
+
+function findFirstTrue(predicate: (value: number) => boolean) {
+  if (predicate(0)) return 0;
+  let low = 0;
+  let high = 1;
+  for (let index = 0; index < 45; index++) {
+    const middle = (low + high) / 2;
+    if (predicate(middle)) high = middle;
+    else low = middle;
+  }
+  return high;
+}
+
+function findLastTrue(predicate: (value: number) => boolean) {
+  if (predicate(1)) return 1;
+  let low = 0;
+  let high = 1;
+  for (let index = 0; index < 45; index++) {
+    const middle = (low + high) / 2;
+    if (predicate(middle)) low = middle;
+    else high = middle;
+  }
+  return low;
+}
+
+function automaticGrooveRadius(input: ShapeInput, grooveWidth: number, csMm: number) {
+  const minimum = 3 * csMm + grooveWidth / 2;
+  if (input.shape === "round") return Math.max(minimum, input.innerDiameter * 0.18);
+  return Math.max(minimum, (input.innerRadius + input.outerRadius) / 2);
+}
+
+function strainAllowed(value: number) {
+  return value <= MAX_STRETCH && value >= -MAX_CIRCUMFERENTIAL_COMPRESSION;
+}
+
+function strainReason(value: number, shape: string) {
+  return value > 0
+    ? `${shape} 허용 영역에 넣으려면 과도한 신장이 필요합니다.`
+    : `${shape} 허용 영역에 넣으려면 과도한 둘레 압축이 필요합니다.`;
 }
 
 function getGlandProfile(size: As568Size, medium: Medium): GlandProfile | null {
@@ -278,4 +453,3 @@ function invalid(requiredStrain: number, reason: string) {
 function clamp(value: number, min: number, max: number) { return Math.min(max, Math.max(min, value)); }
 function lerp(a: number, b: number, t: number) { return a + (b - a) * t; }
 function average(values: [number, number]) { return (values[0] + values[1]) / 2; }
-

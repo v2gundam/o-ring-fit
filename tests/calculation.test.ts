@@ -40,7 +40,7 @@ test("원형 기본 예제는 허용 영역 안의 표준 후보를 찾는다", 
 });
 
 test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한다", () => {
-  const result = searchCandidates(rect, "gas", "internal_pressure");
+  const result = searchCandidates(rect, "gas", "internal_pressure", { grooveShape: "rect", grooveRadius: 20 });
   assert.ok(result.accepted.length > 1);
   for (const candidate of result.accepted) {
     assert.equal(candidate.path.shape, "rect");
@@ -69,7 +69,7 @@ test("형상 입력 오류를 사전에 검출한다", () => {
 });
 
 test("DXF는 R14·mm 헤더와 닫힌 둥근 사각형 가공 루프를 포함한다", () => {
-  const candidate = searchCandidates(rect, "vacuum", "internal_vacuum").accepted[0];
+  const candidate = searchCandidates(rect, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20 }).accepted[0];
   assert.ok(candidate);
   const dxf = buildDxf(candidate, rect, "internal_vacuum", "vacuum");
   assert.match(dxf, /\$ACADVER\n1\nAC1014/);
@@ -77,4 +77,26 @@ test("DXF는 R14·mm 헤더와 닫힌 둥근 사각형 가공 루프를 포함�
   assert.match(dxf, /0\nLWPOLYLINE[\s\S]*?70\n1/);
   assert.match(dxf, /8\nGROOVE_CUT/);
   assert.match(dxf, /0\nEOF/);
+});
+
+test("바깥 경계 R을 줄여도 둥근 사각형 후보가 부당하게 사라지지 않는다", () => {
+  const largeRadius = searchCandidates({ ...rect, outerRadius: 25 }, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20 });
+  const smallRadius = searchCandidates({ ...rect, outerRadius: 5 }, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20 });
+  assert.ok(largeRadius.accepted.length > 0);
+  assert.ok(smallRadius.accepted.length >= largeRadius.accepted.length);
+});
+
+test("허용 영역과 다른 홈 형상도 실제 포함 관계로 찾는다", () => {
+  const roundInRect = searchCandidates({ ...rect, outerWidth: 180, outerHeight: 180 }, "vacuum", "internal_vacuum", { grooveShape: "round" });
+  const rectInRound = searchCandidates({ ...round, outerDiameter: 140 }, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20 });
+  assert.ok(roundInRect.accepted.length > 0);
+  assert.ok(rectInRound.accepted.length > 0);
+  assert.ok(roundInRect.accepted.every((candidate) => candidate.path.shape === "round"));
+  assert.ok(rectInRound.accepted.every((candidate) => candidate.path.shape === "rect"));
+});
+
+test("단면 두께 필터는 선택한 AS568 단면 계열만 남긴다", () => {
+  const result = searchCandidates({ ...rect, outerRadius: 5 }, "vacuum", "internal_vacuum", { grooveShape: "rect", grooveRadius: 20, csMm: 3.53 });
+  assert.ok(result.accepted.length > 0);
+  assert.ok(result.accepted.every((candidate) => Math.abs(candidate.csMm - 3.53) < 0.03));
 });
