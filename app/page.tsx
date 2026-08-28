@@ -369,13 +369,18 @@ export default function Home() {
               <label>홈 {lengthOnlyMode ? (lengthMeasurementEdge === "inner" ? "내측" : "외측") : groovePositionMode === "custom_inner" ? "안쪽" : "바깥쪽"} 가로
                 <span className="number-control"><input type="number" min="0.1" step="0.1" value={lengthOnlyMode ? (lengthMeasurementEdge === "inner" ? customInnerWidth : customOuterWidth) : groovePositionMode === "custom_inner" ? customInnerWidth : customOuterWidth} onChange={(event) => lengthOnlyMode ? (lengthMeasurementEdge === "inner" ? setCustomInnerWidth(event.target.valueAsNumber) : setCustomOuterWidth(event.target.valueAsNumber)) : groovePositionMode === "custom_inner" ? setCustomInnerWidth(event.target.valueAsNumber) : setCustomOuterWidth(event.target.valueAsNumber)} /><em>mm</em></span>
               </label>
+              {lengthOnlyMode && (
+                <label className="radius-option">홈 {lengthMeasurementEdge === "inner" ? "내측" : "외측"} 모서리 R
+                  <span className="number-control"><input type="number" min="0" step="0.5" value={lengthMeasurementRadius} onChange={(event) => setLengthMeasurementRadius(event.target.valueAsNumber)} /><em>mm</em></span>
+                </label>
+              )}
               <label>홈 {lengthOnlyMode ? (lengthMeasurementEdge === "inner" ? "내측" : "외측") : groovePositionMode === "custom_inner" ? "안쪽" : "바깥쪽"} 세로
                 <span className="number-control"><input type="number" min="0.1" step="0.1" value={lengthOnlyMode ? (lengthMeasurementEdge === "inner" ? customInnerHeight : customOuterHeight) : groovePositionMode === "custom_inner" ? customInnerHeight : customOuterHeight} onChange={(event) => lengthOnlyMode ? (lengthMeasurementEdge === "inner" ? setCustomInnerHeight(event.target.valueAsNumber) : setCustomOuterHeight(event.target.valueAsNumber)) : groovePositionMode === "custom_inner" ? setCustomInnerHeight(event.target.valueAsNumber) : setCustomOuterHeight(event.target.valueAsNumber)} /><em>mm</em></span>
               </label>
             </>}
-            {resolvedGrooveShape === "rect" && (
-              <label className="radius-option">홈 {lengthOnlyMode ? (lengthMeasurementEdge === "inner" ? "내측" : "외측") : "중심선"} 모서리 R
-                <span className="number-control"><input type="number" min={lengthOnlyMode ? 0 : 0.1} step="0.5" value={lengthOnlyMode ? lengthMeasurementRadius : grooveRadius} onChange={(event) => lengthOnlyMode ? setLengthMeasurementRadius(event.target.valueAsNumber) : setGrooveRadius(event.target.valueAsNumber)} /><em>mm</em></span>
+            {resolvedGrooveShape === "rect" && !lengthOnlyMode && (
+              <label className="radius-option">홈 중심선 모서리 R
+                <span className="number-control"><input type="number" min="0.1" step="0.5" value={grooveRadius} onChange={(event) => setGrooveRadius(event.target.valueAsNumber)} /><em>mm</em></span>
               </label>
             )}
           </div>
