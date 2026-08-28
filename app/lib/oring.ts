@@ -25,6 +25,12 @@ export type GroovePositionInput =
 
 export type GrooveCenterlineInput = PathGeometry;
 
+/**
+ * 이미 가공된 홈의 내측 또는 외측 경계를 측정한 치수.
+ * 둥근 사각형의 radius 역시 선택한 경계의 실제 모서리 R이다.
+ */
+export type GrooveMeasurementInput = GroovePositionInput;
+
 export type RoundInput = {
   shape: "round";
   innerDiameter: number;
@@ -262,6 +268,31 @@ export function searchCandidatesForGrooveCenterline(input: GrooveCenterlineInput
   return { accepted, near: near.slice(0, 5) };
 }
 
+/**
+ * 허용 영역과의 간섭 검사를 생략하고, 이미 가공된 홈의 내측/외측 측정값을
+ * 후보별 권장 홈 폭으로 중심 경로에 환산해 표준 오링을 역선정한다.
+ */
+export function searchCandidatesForGrooveMeasurement(input: GrooveMeasurementInput, medium: Medium, pressureMode: PressureMode, options: Omit<SearchOptions, "grooveShape" | "grooveRadius" | "fixedRoundDiameter" | "fixedRectSize" | "fixedPath"> = {}) {
+  const accepted: Candidate[] = [];
+  const near: NearCandidate[] = [];
+  if (validateGrooveMeasurement(input).length) return { accepted, near };
+
+  for (const size of AS568_SIZES) {
+    if (Number(size.dash) >= 900) continue;
+    if (options.csMm && Math.abs(size.csIn * INCH_TO_MM - options.csMm) > 0.03) continue;
+    const profile = getGlandProfile(size, medium, options.glandSection ?? "rect");
+    if (!profile) continue;
+    const fixedPath = measuredEdgeToCenterPath(input, profile.widthMm);
+    const evaluated = evaluateSize(size, profile, null, pressureMode, { ...options, fixedPath });
+    if ("candidate" in evaluated) accepted.push(evaluated.candidate);
+    else near.push(evaluated.near);
+  }
+
+  accepted.sort((a, b) => a.score - b.score || Number(a.dash) - Number(b.dash));
+  near.sort((a, b) => Math.abs(a.requiredStrain) - Math.abs(b.requiredStrain) || Number(a.dash) - Number(b.dash));
+  return { accepted, near: near.slice(0, 5) };
+}
+
 export function validateInput(input: ShapeInput): string[] {
   const errors: string[] = [];
   const positive = (value: number) => Number.isFinite(value) && value > 0;
@@ -326,6 +357,24 @@ export function validateGrooveCenterline(input: GrooveCenterlineInput): string[]
   if (!Number.isFinite(input.radius) || input.radius <= 0) errors.push("사용자 지정 홈 중심선 R은 0보다 커야 합니다.");
   if (Number.isFinite(input.radius) && Number.isFinite(input.width) && Number.isFinite(input.height) && input.radius * 2 > Math.min(input.width, input.height)) {
     errors.push("사용자 지정 홈 중심선 R이 가로·세로 치수보다 큽니다.");
+  }
+  return errors;
+}
+
+export function validateGrooveMeasurement(input: GrooveMeasurementInput): string[] {
+  const edgeLabel = input.edge === "inner" ? "내측" : "외측";
+  if (input.shape === "round") {
+    return Number.isFinite(input.diameter) && input.diameter > 0
+      ? []
+      : [`측정한 홈 ${edgeLabel} 직경은 0보다 커야 합니다.`];
+  }
+  const errors: string[] = [];
+  if (![input.width, input.height].every((value) => Number.isFinite(value) && value > 0)) {
+    errors.push(`측정한 홈 ${edgeLabel} 가로와 세로는 0보다 커야 합니다.`);
+  }
+  if (!Number.isFinite(input.radius) || input.radius < 0) errors.push(`측정한 홈 ${edgeLabel} 모서리 R은 0 이상이어야 합니다.`);
+  if (Number.isFinite(input.radius) && Number.isFinite(input.width) && Number.isFinite(input.height) && input.radius * 2 > Math.min(input.width, input.height)) {
+    errors.push(`측정한 홈 ${edgeLabel} 모서리 R이 가로·세로 치수보다 큽니다.`);
   }
   return errors;
 }
@@ -485,6 +534,19 @@ function solvePath(input: ShapeInput | null, grooveWidth: number, csMm: number, 
     ? geometry.groovePathLength + supportOffset
     : geometry.groovePathLength - supportOffset;
   return { ...geometry, pathLength, requiredStrain: pathLength / freeLength - 1 };
+}
+
+function measuredEdgeToCenterPath(input: GrooveMeasurementInput, grooveWidth: number): PathGeometry {
+  const direction = input.edge === "inner" ? 1 : -1;
+  if (input.shape === "round") {
+    return { shape: "round", diameter: input.diameter + direction * grooveWidth };
+  }
+  return {
+    shape: "rect",
+    width: input.width + direction * grooveWidth,
+    height: input.height + direction * grooveWidth,
+    radius: input.radius + direction * grooveWidth / 2,
+  };
 }
 
 function solveFixedPath(path: PathGeometry, grooveWidth: number, csMm: number) {

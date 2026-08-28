@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildDxf } from "../app/lib/dxf";
-import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForGrooveCenterline, searchCandidatesForGroovePosition, validateGrooveCenterline, validateGroovePosition, validateInput, type MixedInput, type RectInput, type RoundInput } from "../app/lib/oring";
+import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForGrooveCenterline, searchCandidatesForGrooveMeasurement, searchCandidatesForGroovePosition, validateGrooveCenterline, validateGrooveMeasurement, validateGroovePosition, validateInput, type MixedInput, type RectInput, type RoundInput } from "../app/lib/oring";
 import Home, { EnvelopePreview, NoMatch, PlanPreview } from "../app/page";
 
 const round: RoundInput = {
@@ -213,6 +213,66 @@ test("길이 전용 모드는 표준 최소 R 미만도 제외하지 않고 비�
   assert.ok(validateGrooveCenterline({ shape: "rect", width: 100, height: 100, radius: 60 }).length > 0);
 });
 
+test("가공 홈 길이 모드는 측정한 원형 홈 내경과 외경을 후보별 홈 폭으로 중심경에 환산한다", () => {
+  const reference = searchCandidatesForGrooveCenterline(
+    { shape: "round", diameter: 124.5 },
+    "vacuum",
+    "internal_vacuum",
+    { csMm: 3.53, glandSection: "rect" },
+  ).accepted[0];
+  assert.ok(reference);
+  assert.equal(reference.path.shape, "round");
+  if (reference.path.shape !== "round") return;
+
+  const measurements = [
+    { shape: "round" as const, edge: "inner" as const, diameter: reference.path.diameter - reference.profile.widthMm },
+    { shape: "round" as const, edge: "outer" as const, diameter: reference.path.diameter + reference.profile.widthMm },
+  ];
+  for (const measurement of measurements) {
+    const result = searchCandidatesForGrooveMeasurement(measurement, "vacuum", "internal_vacuum", { csMm: 3.53, glandSection: "rect" });
+    const matched = result.accepted.find((candidate) => candidate.dash === reference.dash);
+    assert.ok(matched);
+    assert.equal(matched.path.shape, "round");
+    if (matched.path.shape === "round") assert.ok(Math.abs(matched.path.diameter - reference.path.diameter) < 1e-9);
+  }
+});
+
+test("가공 홈 길이 모드는 둥근 사각형의 측정 경계 R까지 중심 경로로 환산한다", () => {
+  const reference = searchCandidatesForGrooveCenterline(
+    { shape: "rect", width: 107.69, height: 107.69, radius: 15 },
+    "vacuum",
+    "internal_vacuum",
+    { csMm: 1.78, glandSection: "rect" },
+  ).accepted.find((candidate) => candidate.dash === "049");
+  assert.ok(reference);
+  assert.equal(reference.path.shape, "rect");
+  if (reference.path.shape !== "rect") return;
+
+  const measurements = [
+    {
+      shape: "rect" as const,
+      edge: "inner" as const,
+      width: reference.path.width - reference.profile.widthMm,
+      height: reference.path.height - reference.profile.widthMm,
+      radius: reference.path.radius - reference.profile.widthMm / 2,
+    },
+    {
+      shape: "rect" as const,
+      edge: "outer" as const,
+      width: reference.path.width + reference.profile.widthMm,
+      height: reference.path.height + reference.profile.widthMm,
+      radius: reference.path.radius + reference.profile.widthMm / 2,
+    },
+  ];
+  for (const measurement of measurements) {
+    assert.equal(validateGrooveMeasurement(measurement).length, 0);
+    const result = searchCandidatesForGrooveMeasurement(measurement, "vacuum", "internal_vacuum", { csMm: 1.78, glandSection: "rect" });
+    const matched = result.accepted.find((candidate) => candidate.dash === "049");
+    assert.ok(matched);
+    assert.deepEqual(matched.path, reference.path);
+  }
+});
+
 test("둥근 사각형 후보는 두 경계를 만족하고 작은 R에는 비표준 경고를 붙인다", () => {
   const result = searchCandidates(rect, "gas", "internal_pressure", { grooveShape: "rect", grooveRadius: 20 });
   assert.ok(result.accepted.length > 1);
@@ -360,7 +420,7 @@ test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 �
   assert.match(homeMarkup, /aria-label="오링 홈 위치 선택"/);
   assert.match(homeMarkup, /사용자 지정\(내경\)/);
   assert.match(homeMarkup, /사용자 지정\(외경\)/);
-  assert.match(homeMarkup, /사용자 지정\(중심선\) · 길이만 계산/);
+  assert.match(homeMarkup, /가공 홈 측정 · 길이만 계산/);
   assert.doesNotMatch(homeMarkup, /표준 오링 후보 찾기/);
   assert.doesNotMatch(homeMarkup, /class="candidate-list"/);
   const grooveShapeStart = homeMarkup.indexOf("오링 홈 형상");
