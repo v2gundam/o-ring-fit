@@ -16,11 +16,14 @@ export type SearchOptions = {
   glandSection?: GlandSection;
   fixedRoundDiameter?: number;
   fixedRectSize?: { width: number; height: number };
+  fixedPath?: PathGeometry;
 };
 
 export type GroovePositionInput =
   | { shape: "round"; edge: "inner" | "outer"; diameter: number }
   | { shape: "rect"; edge: "inner" | "outer"; width: number; height: number; radius: number };
+
+export type GrooveCenterlineInput = PathGeometry;
 
 export type RoundInput = {
   shape: "round";
@@ -235,6 +238,30 @@ export function searchCandidatesForGroovePosition(envelope: ShapeInput, input: G
   return { accepted, near: near.slice(0, 5) };
 }
 
+/**
+ * 허용 영역과의 간섭 검사를 의도적으로 생략하고, 사용자가 지정한 홈 중심
+ * 경로의 길이와 선택 단면의 압력 지지벽 보정만으로 표준 오링을 역선정한다.
+ */
+export function searchCandidatesForGrooveCenterline(input: GrooveCenterlineInput, medium: Medium, pressureMode: PressureMode, options: Omit<SearchOptions, "grooveShape" | "grooveRadius" | "fixedRoundDiameter" | "fixedRectSize" | "fixedPath"> = {}) {
+  const accepted: Candidate[] = [];
+  const near: NearCandidate[] = [];
+  if (validateGrooveCenterline(input).length) return { accepted, near };
+
+  for (const size of AS568_SIZES) {
+    if (Number(size.dash) >= 900) continue;
+    if (options.csMm && Math.abs(size.csIn * INCH_TO_MM - options.csMm) > 0.03) continue;
+    const profile = getGlandProfile(size, medium, options.glandSection ?? "rect");
+    if (!profile) continue;
+    const evaluated = evaluateSize(size, profile, null, pressureMode, { ...options, fixedPath: input });
+    if ("candidate" in evaluated) accepted.push(evaluated.candidate);
+    else near.push(evaluated.near);
+  }
+
+  accepted.sort((a, b) => a.score - b.score || Number(a.dash) - Number(b.dash));
+  near.sort((a, b) => Math.abs(a.requiredStrain) - Math.abs(b.requiredStrain) || Number(a.dash) - Number(b.dash));
+  return { accepted, near: near.slice(0, 5) };
+}
+
 export function validateInput(input: ShapeInput): string[] {
   const errors: string[] = [];
   const positive = (value: number) => Number.isFinite(value) && value > 0;
@@ -288,6 +315,21 @@ export function validateGroovePosition(input: GroovePositionInput): string[] {
   return errors;
 }
 
+export function validateGrooveCenterline(input: GrooveCenterlineInput): string[] {
+  if (input.shape === "round") {
+    return Number.isFinite(input.diameter) && input.diameter > 0
+      ? []
+      : ["사용자 지정 홈 중심경은 0보다 커야 합니다."];
+  }
+  const errors: string[] = [];
+  if (![input.width, input.height].every((value) => Number.isFinite(value) && value > 0)) errors.push("사용자 지정 홈 중심선 가로와 세로는 0보다 커야 합니다.");
+  if (!Number.isFinite(input.radius) || input.radius <= 0) errors.push("사용자 지정 홈 중심선 R은 0보다 커야 합니다.");
+  if (Number.isFinite(input.radius) && Number.isFinite(input.width) && Number.isFinite(input.height) && input.radius * 2 > Math.min(input.width, input.height)) {
+    errors.push("사용자 지정 홈 중심선 R이 가로·세로 치수보다 큽니다.");
+  }
+  return errors;
+}
+
 export function getCornerRadiusGuidance(csMm: number | null, medium: Medium, section: GlandSection): CornerRadiusGuidance | null {
   if (csMm === null || !Number.isFinite(csMm) || csMm <= 0) return null;
   const size = AS568_SIZES.find((item) => Math.abs(item.csIn * INCH_TO_MM - csMm) < 0.03);
@@ -306,7 +348,7 @@ export function getCornerRadiusGuidance(csMm: number | null, medium: Medium, sec
   };
 }
 
-function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput, pressureMode: PressureMode, options: SearchOptions): { candidate: Candidate } | { near: NearCandidate } {
+function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput | null, pressureMode: PressureMode, options: SearchOptions): { candidate: Candidate } | { near: NearCandidate } {
   const idMm = size.idIn * INCH_TO_MM;
   const idToleranceMm = size.idToleranceIn * INCH_TO_MM;
   const csMm = size.csIn * INCH_TO_MM;
@@ -342,7 +384,8 @@ function evaluateSize(size: As568Size, profile: GlandProfile, input: ShapeInput,
   if (profile.section === "half_dovetail_inner") warnings.push("하프 도브 내측형: 경사 유지벽이 챔버 중심 쪽입니다. 압력 지지벽 방향을 가공 전 확인해야 합니다.");
   if (profile.section === "half_dovetail_outer") warnings.push("하프 도브 외측형: 경사 유지벽이 플랜지 바깥쪽입니다. 압력 지지벽 방향을 가공 전 확인해야 합니다.");
   const ratio = geometry.innerCornerRatio;
-  if (ratio !== null && ratio < 6) warnings.push(`안쪽 R이 CS의 ${ratio.toFixed(1)}배로 이상적 기준 6배보다 작습니다.`);
+  if (ratio !== null && ratio < 3) warnings.push(`비표준 조건: 홈 안쪽 R이 CS의 ${ratio.toFixed(1)}배로 표준 최소 기준 3배보다 작습니다. 길이 후보로만 사용하고 코너 응력·주름·누설을 별도 검토해야 합니다.`);
+  else if (ratio !== null && ratio < 6) warnings.push(`홈 안쪽 R이 CS의 ${ratio.toFixed(1)}배로 이상적 기준 6배보다 작습니다.`);
   if (Math.abs(strain) > 0.03) warnings.push("설치 변형률이 권장 범위 상단에 가깝습니다.");
   if (worstStretch > 0.04 || worstCompression < -0.02) warnings.push("치수 공차에 따른 변형률 편차가 큽니다.");
 
@@ -423,22 +466,40 @@ export function verifyLengthFit(input: {
   };
 }
 
-function solvePath(input: ShapeInput, grooveWidth: number, csMm: number, freeLength: number, supportWall: Candidate["supportWall"], pressureAnchored: boolean, options: SearchOptions) {
-  const grooveShape = options.grooveShape ?? (input.shape === "mixed" ? input.innerBoundary.shape : input.shape);
+function solvePath(input: ShapeInput | null, grooveWidth: number, csMm: number, freeLength: number, supportWall: Candidate["supportWall"], pressureAnchored: boolean, options: SearchOptions) {
   const supportOffset = pressureAnchored ? Math.PI * (grooveWidth - csMm) : 0;
   const targetGrooveLength = supportWall === "GROOVE OD" ? freeLength - supportOffset : freeLength + supportOffset;
-  const geometry = grooveShape === "round"
-    ? options.fixedRoundDiameter === undefined
-      ? solveRoundGroove(input, grooveWidth, targetGrooveLength)
-      : solveFixedRoundGroove(input, grooveWidth, options.fixedRoundDiameter)
-    : options.fixedRectSize === undefined
-      ? solveRectGroove(input, grooveWidth, csMm, targetGrooveLength, options.grooveRadius)
-      : solveFixedRectGroove(input, grooveWidth, csMm, options.fixedRectSize, options.grooveRadius);
+  const geometry = options.fixedPath
+    ? solveFixedPath(options.fixedPath, grooveWidth, csMm)
+    : input
+      ? (options.grooveShape ?? (input.shape === "mixed" ? input.innerBoundary.shape : input.shape)) === "round"
+        ? options.fixedRoundDiameter === undefined
+          ? solveRoundGroove(input, grooveWidth, targetGrooveLength)
+          : solveFixedRoundGroove(input, grooveWidth, options.fixedRoundDiameter)
+        : options.fixedRectSize === undefined
+          ? solveRectGroove(input, grooveWidth, csMm, targetGrooveLength, options.grooveRadius)
+          : solveFixedRectGroove(input, grooveWidth, csMm, options.fixedRectSize, options.grooveRadius)
+      : invalid(0, "허용 영역 계산에 필요한 형상 입력이 없습니다.");
   if (!geometry.valid) return geometry;
   const pathLength = supportWall === "GROOVE OD"
     ? geometry.groovePathLength + supportOffset
     : geometry.groovePathLength - supportOffset;
   return { ...geometry, pathLength, requiredStrain: pathLength / freeLength - 1 };
+}
+
+function solveFixedPath(path: PathGeometry, grooveWidth: number, csMm: number) {
+  if (path.shape === "round") {
+    if (path.diameter <= grooveWidth) return invalid(-1, `홈 중심경은 선택 단면의 홈 폭 ${grooveWidth.toFixed(2)} mm보다 커야 합니다.`);
+    const groovePathLength = Math.PI * path.diameter;
+    return { valid: true as const, path, pathLength: groovePathLength, groovePathLength, requiredStrain: 0, innerCornerRatio: null };
+  }
+
+  if (path.width <= grooveWidth || path.height <= grooveWidth) return invalid(-1, `홈 중심선 가로·세로는 선택 단면의 홈 폭 ${grooveWidth.toFixed(2)} mm보다 커야 합니다.`);
+  if (path.radius <= 0 || path.radius * 2 > Math.min(path.width, path.height)) return invalid(-1, "홈 중심선 R이 가로·세로 형상 범위를 벗어납니다.");
+  const innerCornerRadius = path.radius - grooveWidth / 2;
+  if (innerCornerRadius < 0) return invalid(-1, `홈 중심선 R은 선택 단면 홈 폭의 절반인 ${(grooveWidth / 2).toFixed(2)} mm 이상이어야 실제 안쪽 모서리를 만들 수 있습니다.`);
+  const groovePathLength = roundedRectPerimeter(path.width, path.height, path.radius);
+  return { valid: true as const, path, pathLength: groovePathLength, groovePathLength, requiredStrain: 0, innerCornerRatio: innerCornerRadius / csMm };
 }
 
 function solveRoundGroove(input: ShapeInput, grooveWidth: number, targetGrooveLength: number) {
@@ -482,7 +543,7 @@ function solveFixedRectGroove(input: ShapeInput, grooveWidth: number, csMm: numb
   const radius = requestedRadius ?? automaticGrooveRadius(input, grooveWidth, csMm);
   const innerCornerRadius = radius - grooveWidth / 2;
   if (!Number.isFinite(radius) || radius <= 0) return invalid(0, "둥근 사각형 글랜드의 중심선 R은 0보다 커야 합니다.");
-  if (innerCornerRadius < 3 * csMm) return invalid(0, `홈 안쪽 R ${innerCornerRadius.toFixed(2)} mm가 최소 3×CS인 ${(3 * csMm).toFixed(2)} mm보다 작습니다.`);
+  if (innerCornerRadius < 0) return invalid(0, `홈 중심선 R은 선택 단면 홈 폭의 절반인 ${(grooveWidth / 2).toFixed(2)} mm 이상이어야 합니다.`);
   if (size.width <= 0 || size.height <= 0 || radius * 2 > Math.min(size.width, size.height)) {
     return invalid(0, "지정한 홈 가로·세로에 비해 중심선 R이 너무 큽니다.");
   }
@@ -507,7 +568,7 @@ function solveRectGroove(input: ShapeInput, grooveWidth: number, csMm: number, t
   const radius = requestedRadius ?? automaticGrooveRadius(input, grooveWidth, csMm);
   const innerCornerRadius = radius - grooveWidth / 2;
   if (!Number.isFinite(radius) || radius <= 0) return invalid(0, "둥근 사각형 글랜드의 중심선 R은 0보다 커야 합니다.");
-  if (innerCornerRadius < 3 * csMm) return invalid(0, `홈 안쪽 R ${(innerCornerRadius).toFixed(2)} mm가 최소 3×CS인 ${(3 * csMm).toFixed(2)} mm보다 작습니다.`);
+  if (innerCornerRadius < 0) return invalid(0, `홈 중심선 R은 선택 단면 홈 폭의 절반인 ${(grooveWidth / 2).toFixed(2)} mm 이상이어야 합니다.`);
 
   const rawStart = innerSafe.shape === "round"
     ? { width: innerSafe.radius * 2 + grooveWidth, height: innerSafe.radius * 2 + grooveWidth }

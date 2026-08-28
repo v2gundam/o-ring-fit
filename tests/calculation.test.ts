@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { buildDxf } from "../app/lib/dxf";
-import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForGroovePosition, validateGroovePosition, validateInput, type MixedInput, type RectInput, type RoundInput } from "../app/lib/oring";
+import { getCornerRadiusGuidance, searchCandidates, searchCandidatesForGrooveCenterline, searchCandidatesForGroovePosition, validateGrooveCenterline, validateGroovePosition, validateInput, type MixedInput, type RectInput, type RoundInput } from "../app/lib/oring";
 import Home, { EnvelopePreview, NoMatch, PlanPreview } from "../app/page";
 
 const round: RoundInput = {
@@ -185,7 +185,35 @@ test("사용자 지정 둥근 사각형 홈은 안쪽·바깥쪽 가로세로와
   assert.ok(validateGroovePosition({ shape: "rect", edge: "inner", width: 0, height: 100, radius: 20 }).length > 0);
 });
 
-test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한다", () => {
+test("길이 전용 모드는 허용 영역 없이 지정한 홈 중심 경로에서 AS568 후보를 찾는다", () => {
+  const result = searchCandidatesForGrooveCenterline(
+    { shape: "rect", width: 107.69, height: 107.69, radius: 15 },
+    "vacuum",
+    "internal_vacuum",
+    { csMm: 1.78, glandSection: "rect" },
+  );
+  const as568049 = result.accepted.find((candidate) => candidate.dash === "049");
+  assert.ok(as568049);
+  assert.equal(as568049.path.shape, "rect");
+  assert.ok(Math.abs(as568049.groovePathLengthMm - 405.007) < 0.01);
+  assert.ok(Math.abs(as568049.lengthCheck.differenceMm) < 0.01);
+  assert.equal(validateGrooveCenterline({ shape: "rect", width: 107.69, height: 107.69, radius: 15 }).length, 0);
+});
+
+test("길이 전용 모드는 표준 최소 R 미만도 제외하지 않고 비표준 경고를 붙인다", () => {
+  const result = searchCandidatesForGrooveCenterline(
+    { shape: "rect", width: 100, height: 100, radius: 5 },
+    "vacuum",
+    "internal_vacuum",
+    { csMm: 3.53, glandSection: "rect" },
+  );
+  assert.ok(result.accepted.length > 0);
+  assert.ok(result.accepted.some((candidate) => candidate.innerCornerRatio !== null && candidate.innerCornerRatio < 3));
+  assert.ok(result.accepted.every((candidate) => candidate.warnings.some((warning) => /비표준 조건|표준 최소 기준/.test(warning))));
+  assert.ok(validateGrooveCenterline({ shape: "rect", width: 100, height: 100, radius: 60 }).length > 0);
+});
+
+test("둥근 사각형 후보는 두 경계를 만족하고 작은 R에는 비표준 경고를 붙인다", () => {
   const result = searchCandidates(rect, "gas", "internal_pressure", { grooveShape: "rect", grooveRadius: 20 });
   assert.ok(result.accepted.length > 1);
   for (const candidate of result.accepted) {
@@ -196,7 +224,8 @@ test("둥근 사각형 후보는 홈 안쪽 R 3×CS와 두 경계를 만족한�
     assert.ok(candidate.path.height - candidate.profile.widthMm >= rect.innerHeight + 2 * rect.innerMargin - 1e-8);
     assert.ok(candidate.path.width + candidate.profile.widthMm <= rect.outerWidth - 2 * rect.outerMargin + 1e-8);
     assert.ok(candidate.path.height + candidate.profile.widthMm <= rect.outerHeight - 2 * rect.outerMargin + 1e-8);
-    assert.ok(candidate.path.radius - halfWidth >= 3 * candidate.csMm - 1e-8);
+    const innerRadius = candidate.path.radius - halfWidth;
+    if (innerRadius < 3 * candidate.csMm) assert.ok(candidate.warnings.some((warning) => /비표준 조건|표준 최소 기준/.test(warning)));
     assert.equal(candidate.supportWall, "GROOVE OD");
   }
 });
@@ -331,6 +360,7 @@ test("모바일 작업 화면은 후보를 콤보박스로 선택하고 기본 �
   assert.match(homeMarkup, /aria-label="오링 홈 위치 선택"/);
   assert.match(homeMarkup, /사용자 지정\(내경\)/);
   assert.match(homeMarkup, /사용자 지정\(외경\)/);
+  assert.match(homeMarkup, /사용자 지정\(중심선\) · 길이만 계산/);
   assert.doesNotMatch(homeMarkup, /표준 오링 후보 찾기/);
   assert.doesNotMatch(homeMarkup, /class="candidate-list"/);
   const grooveShapeStart = homeMarkup.indexOf("오링 홈 형상");

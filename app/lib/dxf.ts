@@ -19,7 +19,9 @@ export function buildDxf(candidate: Candidate, input: ShapeInput, pressureMode: 
   }
 
   const outerBoundary = getEnvelopeBoundaries(input).outer;
-  const bounds = outerBoundary.shape === "round" ? outerBoundary.diameter : Math.max(outerBoundary.width, outerBoundary.height);
+  const envelopeBounds = outerBoundary.shape === "round" ? outerBoundary.diameter : Math.max(outerBoundary.width, outerBoundary.height);
+  const pathBounds = candidate.path.shape === "round" ? candidate.path.diameter + width : Math.max(candidate.path.width, candidate.path.height) + width;
+  const bounds = Math.max(envelopeBounds, pathBounds);
   const noteX = bounds / 2 + 18;
   const topY = bounds / 2;
   addText(entities, "NOTES", noteX, topY, 3.5, `O-RING: AS568-${candidate.dash} / ID ${fmt(candidate.idMm)} x CS ${fmt(candidate.csMm)} mm`);
@@ -30,6 +32,9 @@ export function buildDxf(candidate: Candidate, input: ShapeInput, pressureMode: 
   addText(entities, "NOTES", noteX, topY - 30, 3.0, `INSTALL: ${candidate.label.toUpperCase()} / SQUEEZE ${candidate.profile.squeezePercent.toFixed(1)}% / MEDIUM ${medium.toUpperCase()}`);
   addText(entities, "PRESSURE", noteX, topY - 36, 3.0, `O-RING MOVEMENT: ${pressureMode.toUpperCase()} / SUPPORT: ${candidate.supportWall}`);
   addText(entities, "NOTES", noteX, topY - 42, 2.5, `REFERENCE: PARKER ORD 5700 ${candidate.profile.section === "rect" ? "FACE SEAL" : "DOVETAIL"} PROFILE / VERIFY BEFORE MACHINING`);
+  if (candidate.innerCornerRatio !== null && candidate.innerCornerRatio < 3) {
+    addText(entities, "NOTES", noteX, topY - 48, 2.5, `WARNING: NONSTANDARD INNER CORNER R ${fmt(candidate.path.shape === "rect" ? candidate.path.radius - width / 2 : 0)} mm < 3 x CS / LENGTH FIT ONLY`);
+  }
 
   const sectionX = noteX;
   const sectionY = -bounds / 2 + 18;
