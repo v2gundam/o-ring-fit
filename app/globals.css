@@ -72,7 +72,7 @@ legend i { display:inline-block; width:7px; height:7px; margin-right:5px; border
 .drawing-data { display:grid; grid-template-columns:1fr 1.4fr 1fr; border-top:1px solid #3c554f; border-bottom:1px solid #3c554f; }
 .drawing-data div { display:flex; flex-direction:column; gap:5px; padding:13px 10px; }.drawing-data div+div { border-left:1px solid #3c554f; }.drawing-data small { color:#98afa6; font-size:8px; }.drawing-data b { font-size:11px; }.accent-text { color:#ff947b; }
 .dxf-button { margin-top:14px; background:var(--mint); color:var(--ink); box-shadow:none; }
-footer { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:18px 2px 0; color:var(--muted); font-size:9px; }footer span { font-weight:800; letter-spacing:1px; }footer p { margin:0; }
+footer { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:18px 2px 0; color:var(--muted); font-size:9px; }footer span { font-weight:800; letter-spacing:1px; }footer p { margin:0; }footer a { color:inherit; text-decoration:underline; text-underline-offset:2px; }
 
 .fixed-material { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px; margin-top:12px; padding:10px 11px; border:1px solid #b8cac2; background:#edf5f1; font-size:10px; }
 .fixed-material span { color:var(--muted); }.fixed-material b { font-size:11px; }.fixed-material em { color:#91714d; font-size:8px; font-style:normal; }
@@ -273,7 +273,7 @@ footer { font-size:11px; line-height:1.5; }
   .empty-preview{min-height:132px;padding:10px}
   .preview-dimensions text{font-size:13px;stroke-width:2.5px}.radius-callouts .radius-label{font-size:10px}
   .basis-bar,body>.basis-bar{display:none}
-  .shell>footer{display:none}
+  .shell>footer{display:flex;align-items:flex-start;flex-direction:column;gap:4px;padding:12px 2px 0;font-size:11px}
   .plan-dimension-grid{grid-template-columns:1fr}
   .plan-dimension-grid>span+span{border-left:0;border-top:1px solid var(--line)}
   .compact .plan-dimension-grid>span+span{border-color:#456159}

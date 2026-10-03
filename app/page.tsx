@@ -518,7 +518,7 @@ export default function Home() {
         <div><b>검토 필요</b><span>온도·압력·표면조도·공차·FKM 경도/컴파운드</span></div>
       </section>
 
-      <footer><span>MVP · AS568F · FKM</span><p>본 결과는 설계 보조 정보입니다. 제조 전 제조사 자료와 실제 운전 조건으로 검증하세요.</p></footer>
+      <footer><span>MVP · AS568F · FKM</span><p>본 결과는 설계 보조 정보입니다. 제조 전 제조사 자료와 실제 운전 조건으로 검증하세요. <a href="./privacy.html">개인정보·광고 안내</a></p></footer>
 
       {dxfOpen && selected && (
         <DxfDialog
